@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System Simulation with Three.js and WebGPU</title>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.172.0/three.module.min.js"
+            }
+        }
+        </script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            pointer-events: none;
+            z-index: 100;
+            text-shadow: 0 0 3px #000;
+            font-size: 16px;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            text-align: center;
+            font-size: 18px;
+            transform: translateY(-50%);
+            text-shadow: 0 0 3px #000;
+        }
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 100;
+        }
+        #planet-info {
+            position: absolute;
+            top: 40px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 100;
+            max-width: 200px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">Solar System Simulation with Three.js</div>
+    <div id="loading">Loading 3D solar system...</div>
+    <div id="controls">
+        Controls:<br>
+        - Mouse drag to rotate<br>
+        - Mouse wheel to zoom<br>
+        - Right-click drag to pan
+    </div>
+    <div id="planet-info"></div>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'https://unpkg.com/three@0.172.0/examples/jsm/controls/OrbitControls.js';
+        
+        // Scene variables
+        let scene, camera, renderer, controls;
+        let sun, planets = [];
+        let planetInfoEl;
+        
+        // Constants
+        const EARTH_RADIUS = 1;
+        const SUN_RADIUS = EARTH_RADIUS * 10;
+        const ORBIT_SCALE = 20; // Increased scale for better visualization
+        const SUN_MARGIN = SUN_RADIUS * 1.2; // Minimum distance from sun center to orbit
+        const TIME_SCALE = 0.2; // Control the simulation speed
+        
+        // Planet data (relative to Earth)
+        const planetData = [
+            { name: 'Mercury', radius: 0.38, distance: 0.4, color: 0xaaa9ad, rotationSpeed: 0.01, orbitSpeed: 0.04, description: "The smallest and innermost planet in the Solar System." },
+            { name: 'Venus', radius: 0.95, distance: 0.7, color: 0xe39e1c, rotationSpeed: 0.005, orbitSpeed: 0.015, description: "Second planet from the Sun. Similar in size to Earth but with a toxic atmosphere." },
+            { name: 'Earth', radius: 1, distance: 1, color: 0x6b93d6, rotationSpeed: 0.01, orbitSpeed: 0.01, description: "Our home planet. The only known celestial object to harbor life.", moons: [
+                { name: 'Moon', radius: 0.27, distance: 0.1, color: 0xffffff, orbitSpeed: 0.05 }
+            ]},
+            { name: 'Mars', radius: 0.53, distance: 1.5, color: 0xc1440e, rotationSpeed: 0.01, orbitSpeed: 0.008, description: "The 'Red Planet', known for its reddish appearance due to iron oxide." },
+            { name: 'Jupiter', radius: 2.8, distance: 5.2, color: 0xd8ca9d, rotationSpeed: 0.02, orbitSpeed: 0.002, description: "The largest planet in our Solar System. A gas giant with a Great Red Spot." },
+            { name: 'Saturn', radius: 2.4, distance: 9.5, color: 0xead6b8, rotationSpeed: 0.018, orbitSpeed: 0.0009, description: "Known for its prominent ring system made of ice particles.", rings: true },
+            { name: 'Uranus', radius: 1.8, distance: 19.2, color: 0xd1e7e7, rotationSpeed: 0.01, orbitSpeed: 0.0004, description: "An ice giant with a tilted axis of rotation." },
+            { name: 'Neptune', radius: 1.8, distance: 30.1, color: 0x5b5ddf, rotationSpeed: 0.01, orbitSpeed: 0.0001, description: "The windiest planet, with the fastest winds in the Solar System." }
+        ];
+        
+        // Initialize the simulation
+        async function init() {
+            planetInfoEl = document.getElementById('planet-info');
+            
+            // Create scene
+            scene = new THREE.Scene();
+            
+            // Create camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 20, 50);
+            
+            // Initialize renderer (WebGL for now as WebGPU may need specific configuration)
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                alpha: true
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            // Enable sorting for proper transparency rendering
+            renderer.sortObjects = true;
+            document.body.appendChild(renderer.domElement);
+            
+            document.getElementById('info').innerHTML = 'Solar System Simulation with Three.js';
+            document.getElementById('loading').style.display = 'none';
+            
+            // Setup controls and scene elements
+            setupScene();
+            createSolarSystem();
+            
+            // Start animation loop
+            animate();
+        }
+        
+        // General scene setup
+        function setupScene() {
+            // Add ambient light for overall visibility
+            const ambientLight = new THREE.AmbientLight(0x444444, 0.8);
+            scene.add(ambientLight);
+            
+            // Add camera controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = SUN_RADIUS + 5;
+            controls.maxDistance = 200;
+            
+            // Add stars
+            createStars();
+            
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+            
+            // Add raycaster for interactivity
+            setupRaycaster();
+        }
+        
+        // Create stars background
+        function createStars() {
+            const starCount = 10000;
+            const starGeometry = new THREE.BufferGeometry();
+            const starPositions = new Float32Array(starCount * 3);
+            
+            for (let i = 0; i < starCount; i++) {
+                const i3 = i * 3;
+                // Position stars in a sphere around the scene
+                const radius = Math.random() * 400 + 100;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI;
+                
+                starPositions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+                starPositions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                starPositions[i3 + 2] = radius * Math.cos(phi);
+            }
+            
+            starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+            
+            const starMaterial = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.5,
+                sizeAttenuation: true
+            });
+            
+            const stars = new THREE.Points(starGeometry, starMaterial);
+            scene.add(stars);
+        }
+        
+        // Create the sun and planets
+        function createSolarSystem() {
+            // Create sun with enhanced glow
+            const sunGeometry = new THREE.SphereGeometry(SUN_RADIUS, 64, 64);
+            
+            // Generate sun texture
+            const sunTexture = createSunTexture();
+            
+            // Use a more advanced material with WebGPU compatible settings
+            const sunMaterial = new THREE.MeshStandardMaterial({
+                map: sunTexture,
+                emissive: 0xffaa00,
+                emissiveIntensity: 2,
+                roughness: 0.2,
+                metalness: 0,
+                transparent: false,
+                depthWrite: true
+            });
+            
+            sun = new THREE.Mesh(sunGeometry, sunMaterial);
+            sun.userData = { name: 'Sun', description: "The star at the center of our Solar System." };
+            scene.add(sun);
+            
+            // Add a light at the sun's position
+            const sunLight = new THREE.PointLight(0xffffff, 2, 300, 1);
+            sun.add(sunLight);
+            
+            // Add multiple glow layers for enhanced effect
+            addSunGlow(SUN_RADIUS * 4, 0xffaa00, 0.8);
+            addSunGlow(SUN_RADIUS * 5, 0xff7700, 0.5);
+            addSunGlow(SUN_RADIUS * 6, 0xff5500, 0.3);
+            
+            // Create planets
+            planetData.forEach(data => {
+                const planetObj = createPlanet(data);
+                planets.push(planetObj);
+                scene.add(planetObj.orbit);
+                
+                // Create orbit visualization
+                createOrbitLine(data.distance * ORBIT_SCALE);
+            });
+        }
+        
+        // Create a procedural sun texture
+        function createSunTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const context = canvas.getContext('2d');
+            
+            // Create radial gradient for sun surface
+            const gradient = context.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, 0,
+                canvas.width / 2, canvas.height / 2, canvas.width / 2
+            );
+            
+            gradient.addColorStop(0, '#ffdd00');
+            gradient.addColorStop(0.5, '#ffaa00');
+            gradient.addColorStop(1, '#ff6600');
+            
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Add some noise to make it look more like the sun
+            for (let i = 0; i < 5000; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const radius = Math.random() * 2 + 1;
+                
+                context.beginPath();
+                context.arc(x, y, radius, 0, Math.PI * 2);
+                context.fillStyle = Math.random() > 0.5 ? '#ffff00' : '#ff8800';
+                context.fill();
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            return texture;
+        }
+        
+        // Add glow effect to the sun
+        function addSunGlow(size, color, opacity) {
+            const spriteMaterial = new THREE.SpriteMaterial({
+                map: createGlowTexture(),
+                color: color,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                opacity: opacity,
+                depthWrite: false,  // Don't write to depth buffer
+                depthTest: false    // Don't test against depth buffer
+            });
+            
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.scale.set(size, size, 1);
+            sprite.renderOrder = -1; // Render before other objects
+            sun.add(sprite);
+        }
+        
+        // Create a glow texture for the sun
+        function createGlowTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const context = canvas.getContext('2d');
+            
+            const gradient = context.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, 0,
+                canvas.width / 2, canvas.height / 2, canvas.width / 2
+            );
+            
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(0.3, 'rgba(255, 255, 128, 0.8)');
+            gradient.addColorStop(0.7, 'rgba(255, 128, 0, 0.3)');
+            gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
+            
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            return texture;
+        }
+        
+        // Create a planet
+        function createPlanet(data) {
+            // Calculate actual orbit radius (sun margin + scaled distance)
+            const orbitRadius = SUN_MARGIN + (data.distance * ORBIT_SCALE);
+            // Create orbit group
+            const orbit = new THREE.Group();
+            
+            // Create planet geometry and material
+            const planetGeometry = new THREE.SphereGeometry(data.radius * EARTH_RADIUS, 32, 32);
+            
+            // Create procedural texture for the planet
+            const planetTexture = createPlanetTexture(data);
+            
+            const planetMaterial = new THREE.MeshStandardMaterial({
+                map: planetTexture,
+                color: data.color,
+                roughness: 0.5,
+                metalness: 0.2,
+                emissive: data.color,
+                emissiveIntensity: 0.1
+            });
+            
+            const planet = new THREE.Mesh(planetGeometry, planetMaterial);
+            planet.position.x = orbitRadius;
+            planet.userData = { 
+                name: data.name, 
+                description: data.description || "",
+                radius: data.radius * EARTH_RADIUS,
+                distance: orbitRadius
+            };
+            
+            // Random initial rotation
+            planet.rotation.x = Math.random() * Math.PI;
+            planet.rotation.y = Math.random() * Math.PI;
+            
+            orbit.add(planet);
+            
+            // Add a rim light helper function
+            function addPlanetGlow(planet, radius, color) {
+                const glowMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        c: { value: 0.2 },
+                        p: { value: 4.5 },
+                        glowColor: { value: new THREE.Color(color) },
+                        viewVector: { value: new THREE.Vector3(0, 0, 0) }
+                    },
+                    vertexShader: `
+                        uniform vec3 viewVector;
+                        varying float intensity;
+                        void main() {
+                            vec3 vNormal = normalize(normalMatrix * normal);
+                            vec3 vNormel = normalize(normalMatrix * viewVector);
+                            intensity = pow(0.5 - dot(vNormal, vNormel), 4.0);
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform vec3 glowColor;
+                        varying float intensity;
+                        void main() {
+                            gl_FragColor = vec4(glowColor, intensity * 0.5);
+                        }
+                    `,
+                    side: THREE.BackSide,
+                    blending: THREE.AdditiveBlending,
+                    transparent: true
+                });
+
+                const glow = new THREE.Mesh(
+                    new THREE.SphereGeometry(radius * 1.2, 32, 32),
+                    glowMaterial
+                );
+                planet.add(glow);
+                
+                // Update view vector in animation loop
+                const updateViewVector = () => {
+                    const viewVector = new THREE.Vector3().subVectors(
+                        camera.position,
+                        planet.getWorldPosition(new THREE.Vector3())
+                    );
+                    glow.material.uniforms.viewVector.value = viewVector;
+                };
+                
+                // Store the update function
+                planet.userData.updateGlow = updateViewVector;
+            }
+            
+            // Add a subtle glow to the planet
+            if (data.name === 'Earth') {
+                addPlanetGlow(planet, data.radius * EARTH_RADIUS, 0x4466ff);
+            } else if (data.name === 'Mars') {
+                addPlanetGlow(planet, data.radius * EARTH_RADIUS, 0xff4422);
+            } else if (data.name === 'Venus') {
+                addPlanetGlow(planet, data.radius * EARTH_RADIUS, 0xffaa44);
+            } else if (data.name === 'Jupiter' || data.name === 'Saturn') {
+                addPlanetGlow(planet, data.radius * EARTH_RADIUS, 0xffcc66);
+            } else {
+                addPlanetGlow(planet, data.radius * EARTH_RADIUS, 0x66aaff);
+            }
+            
+            // Create planet object to track properties
+            const planetObj = {
+                mesh: planet,
+                orbit: orbit,
+                rotationSpeed: data.rotationSpeed * TIME_SCALE,
+                orbitSpeed: data.orbitSpeed * TIME_SCALE,
+                moons: [],
+                name: data.name
+            };
+            
+            // Add rings for Saturn
+            if (data.rings) {
+                addRings(planet, data.radius);
+            }
+            
+            // Create moons if defined
+            if (data.moons) {
+                data.moons.forEach(moon => {
+                    const moonObj = createMoon(moon, planet);
+                    planetObj.moons.push(moonObj);
+                });
+            }
+            
+            return planetObj;
+        }
+        
+        // Generate procedural texture for planets
+        function createPlanetTexture(data) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            
+            // Fill background with planet color
+            ctx.fillStyle = '#' + data.color.toString(16).padStart(6, '0');
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Add texture details based on planet type
+            if (data.name === 'Earth') {
+                // Add continents
+                ctx.fillStyle = '#2a6e29';
+                for (let i = 0; i < 7; i++) {
+                    const x = Math.random() * canvas.width;
+                    const y = Math.random() * canvas.height;
+                    const radius = Math.random() * 50 + 20;
+                    drawBlobWithNoise(ctx, x, y, radius, 0.4);
+                }
+                
+                // Add polar ice caps
+                ctx.fillStyle = '#ffffff';
+                for (let y = 0; y < 60; y++) {
+                    const noiseAmt = Math.random() * 20;
+                    ctx.fillRect(noiseAmt, y, canvas.width - noiseAmt * 2, 1);
+                    ctx.fillRect(noiseAmt, canvas.height - y, canvas.width - noiseAmt * 2, 1);
+                }
+            } else if (data.name === 'Jupiter' || data.name === 'Saturn') {
+                // Gas giants with bands
+                const bands = Math.floor(Math.random() * 5) + 5;
+                const bandHeight = canvas.height / bands;
+                
+                for (let i = 0; i < bands; i++) {
+                    const y = i * bandHeight;
+                    const color = adjustColor(data.color, -20 + Math.random() * 40);
+                    ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+                    ctx.fillRect(0, y, canvas.width, bandHeight);
+                    
+                    // Add some cloud-like details
+                    addClouds(ctx, 0, y, canvas.width, bandHeight, 20);
+                }
+                
+                // Add the Great Red Spot for Jupiter
+                if (data.name === 'Jupiter') {
+                    ctx.fillStyle = '#ff4422';
+                    drawBlobWithNoise(ctx, canvas.width * 0.7, canvas.height * 0.4, 40, 0.2);
+                }
+            } else if (data.name === 'Mars') {
+                // Add Mars-like surface features
+                ctx.fillStyle = '#8B4513';
+                for (let i = 0; i < 20; i++) {
+                    const x = Math.random() * canvas.width;
+                    const y = Math.random() * canvas.height;
+                    const radius = Math.random() * 20 + 5;
+                    drawBlobWithNoise(ctx, x, y, radius, 0.5);
+                }
+            } else {
+                // Generic planet surface with some variation
+                for (let i = 0; i < 50; i++) {
+                    const x = Math.random() * canvas.width;
+                    const y = Math.random() * canvas.height;
+                    const radius = Math.random() * 15 + 5;
+                    const color = adjustColor(data.color, -30 + Math.random() * 60);
+                    ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+                    drawBlobWithNoise(ctx, x, y, radius, 0.3);
+                }
+            }
+            
+            return new THREE.CanvasTexture(canvas);
+        }
+        
+        // Helper function to draw blob with noise for planet features
+        function drawBlobWithNoise(ctx, x, y, radius, noiseAmount) {
+            ctx.beginPath();
+            const points = 12;
+            
+            for (let i = 0; i <= points; i++) {
+                const angle = (i / points) * Math.PI * 2;
+                const noise = 1 - noiseAmount + Math.random() * noiseAmount * 2;
+                const px = x + Math.cos(angle) * radius * noise;
+                const py = y + Math.sin(angle) * radius * noise;
+                
+                if (i === 0) {
+                    ctx.moveTo(px, py);
+                } else {
+                    ctx.lineTo(px, py);
+                }
+            }
+            
+            ctx.fill();
+        }
+        
+        // Add cloud-like details to gas planets
+        function addClouds(ctx, x, y, width, height, count) {
+            const originalFill = ctx.fillStyle;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            
+            for (let i = 0; i < count; i++) {
+                const cloudX = x + Math.random() * width;
+                const cloudY = y + Math.random() * height;
+                const cloudRadius = Math.random() * 10 + 5;
+                drawBlobWithNoise(ctx, cloudX, cloudY, cloudRadius, 0.5);
+            }
+            
+            ctx.fillStyle = originalFill;
+        }
+        
+        // Adjust color brightness
+        function adjustColor(color, amount) {
+            const r = Math.min(255, Math.max(0, ((color >> 16) & 0xFF) + amount));
+            const g = Math.min(255, Math.max(0, ((color >> 8) & 0xFF) + amount));
+            const b = Math.min(255, Math.max(0, (color & 0xFF) + amount));
+            
+            return (r << 16) | (g << 8) | b;
+        }
+        
+        // Add rings to Saturn
+        function addRings(planet, planetRadius) {
+            const innerRadius = planetRadius * EARTH_RADIUS * 1.5;
+            const outerRadius = planetRadius * EARTH_RADIUS * 2.5;
+            
+            const ringGeometry = new THREE.RingGeometry(innerRadius, outerRadius, 64);
+            
+            // Generate ring texture
+            const ringTexture = createRingTexture();
+            
+            const ringMaterial = new THREE.MeshBasicMaterial({
+                map: ringTexture,
+                color: 0xffd699,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            ring.rotation.x = Math.PI / 2;
+            planet.add(ring);
+        }
+        
+        // Create ring texture for Saturn
+        function createRingTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            
+            // Base color
+            ctx.fillStyle = '#ab9c7d';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Add ring bands
+            for (let i = 0; i < canvas.width; i += 4) {
+                const brightness = 0.5 + Math.random() * 0.5;
+                const opacity = Math.random() > 0.2 ? brightness : brightness * 0.5;
+                
+                ctx.fillStyle = `rgba(255, 230, 180, ${opacity})`;
+                const size = Math.random() * 12 + 1;
+                ctx.fillRect(i, 0, size, canvas.height);
+            }
+            
+            // Add Cassini division
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(canvas.width * 0.65, 0, canvas.width * 0.1, canvas.height);
+            
+            return new THREE.CanvasTexture(canvas);
+        }
+        
+        // Create a moon orbiting a planet
+        function createMoon(data, planet) {
+            // Create moon orbit
+            const moonOrbit = new THREE.Group();
+            planet.add(moonOrbit);
+            
+            // Create moon
+            const moonGeometry = new THREE.SphereGeometry(data.radius * EARTH_RADIUS, 16, 16);
+            
+            // Create moon texture with craters
+            const moonTexture = createMoonTexture();
+            
+            const moonMaterial = new THREE.MeshStandardMaterial({
+                map: moonTexture,
+                color: data.color,
+                roughness: 0.7,
+                metalness: 0.1,
+                emissive: 0x555555,
+                emissiveIntensity: 0.05
+            });
+            
+            const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+            moon.position.x = data.distance * 5; // Scaled for visibility
+            moon.userData = { 
+                name: data.name,
+                isMoon: true,
+                parentName: planet.userData.name
+            };
+            
+            moonOrbit.add(moon);
+            
+            // Also add a very subtle glow to the moon
+            if (data.name === 'Moon') {
+                const glowMaterial = new THREE.SpriteMaterial({
+                    map: createGlowTexture(),
+                    color: 0xaaaaaa,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending,
+                    opacity: 0.3
+                });
+                
+                const glow = new THREE.Sprite(glowMaterial);
+                glow.scale.set(data.radius * EARTH_RADIUS * 3, data.radius * EARTH_RADIUS * 3, 1);
+                moon.add(glow);
+            }
+            
+            // Return moon object
+            return {
+                mesh: moon,
+                orbit: moonOrbit,
+                orbitSpeed: data.orbitSpeed * TIME_SCALE,
+                name: data.name
+            };
+        }
+        
+        // Create a moon texture with craters
+        function createMoonTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            
+            // Base color for the moon
+            ctx.fillStyle = '#aaaaaa';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Add some subtle color variation
+            for (let i = 0; i < 300; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const radius = Math.random() * 5 + 1;
+                
+                ctx.fillStyle = `rgba(150, 150, 150, ${Math.random() * 0.3 + 0.1})`;
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Add craters
+            for (let i = 0; i < 30; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const radius = Math.random() * 10 + 2;
+                
+                // Crater outer rim (lighter)
+                ctx.fillStyle = 'rgba(200, 200, 200, 0.8)';
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Crater inner (darker)
+                ctx.fillStyle = 'rgba(70, 70, 70, 0.8)';
+                ctx.beginPath();
+                ctx.arc(x, y, radius * 0.8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            return new THREE.CanvasTexture(canvas);
+        }
+        
+        // Create orbit visualization
+        function createOrbitLine(radius) {
+            const orbitRadius = SUN_MARGIN + radius;
+            const segments = 128;
+            const orbitGeometry = new THREE.BufferGeometry();
+            const orbitMaterial = new THREE.LineBasicMaterial({
+                color: 0x4488ff,
+                transparent: true,
+                opacity: 0.6,
+                linewidth: 2,
+                depthWrite: false  // Don't write to depth buffer
+            });
+            
+            const vertices = [];
+            for (let i = 0; i <= segments; i++) {
+                const theta = (i / segments) * Math.PI * 2;
+                vertices.push(orbitRadius * Math.cos(theta), 0, orbitRadius * Math.sin(theta));
+            }
+            
+            orbitGeometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            const orbit = new THREE.Line(orbitGeometry, orbitMaterial);
+            orbit.renderOrder = 2; // Ensure it renders above other objects
+            
+            // Add a subtle glow to orbit lines
+            const orbitGlow = new THREE.Line(orbitGeometry, new THREE.LineBasicMaterial({
+                color: 0x8baaff,
+                transparent: true,
+                opacity: 0.3,
+                linewidth: 5,
+                depthWrite: false  // Don't write to depth buffer
+            }));
+            orbitGlow.renderOrder = 1; // Render after the main orbit line
+            
+            scene.add(orbit);
+            scene.add(orbitGlow);
+        }
+        
+        // Setup raycaster for interactivity
+        function setupRaycaster() {
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            
+            // Create event listener for mouse movement
+            window.addEventListener('mousemove', (event) => {
+                // Calculate mouse position in normalized device coordinates
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                // Update the raycaster
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Get intersected objects
+                const intersects = raycaster.intersectObjects(scene.children, true);
+                
+                if (intersects.length > 0) {
+                    // Check if we hit a planet or moon
+                    let selectedObject = null;
+                    
+                    for (let i = 0; i < intersects.length; i++) {
+                        const object = intersects[i].object;
+                        if (object.userData && (object.userData.name || object.userData.isMoon)) {
+                            selectedObject = object;
+                            break;
+                        }
+                    }
+                    
+                    if (selectedObject) {
+                        // Display planet/moon info
+                        if (selectedObject.userData.isMoon) {
+                            planetInfoEl.innerHTML = `
+                                <strong>${selectedObject.userData.name}</strong><br>
+                                Moon of ${selectedObject.userData.parentName}
+                            `;
+                        } else {
+                            planetInfoEl.innerHTML = `
+                                <strong>${selectedObject.userData.name}</strong><br>
+                                ${selectedObject.userData.description || ''}
+                            `;
+                        }
+                        planetInfoEl.style.display = 'block';
+                    } else {
+                        planetInfoEl.style.display = 'none';
+                    }
+                } else {
+                    planetInfoEl.style.display = 'none';
+                }
+            });
+        }
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Rotate the sun
+            sun.rotation.y += 0.002 * TIME_SCALE;
+            
+            // Update planet positions and rotations
+            planets.forEach(planet => {
+                // Planet orbit
+                planet.orbit.rotation.y += planet.orbitSpeed;
+                
+                // Planet rotation
+                planet.mesh.rotation.y += planet.rotationSpeed;
+                
+                // Update any glow effects on planets
+                if (planet.mesh.userData.updateGlow) {
+                    planet.mesh.userData.updateGlow();
+                }
+                
+                // Update moons
+                planet.moons.forEach(moon => {
+                    moon.orbit.rotation.y += moon.orbitSpeed;
+                });
+            });
+            
+            // Update controls
+            controls.update();
+            
+            // Render the scene
+            renderer.render(scene, camera);
+        }
+        
+        // Start the application
+        init();
+    </script>
+</body>
+</html>
