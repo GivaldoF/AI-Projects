@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Ondas Sonoras</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(4px);
+        }
+        
+        h1 {
+            margin-bottom: 1.5rem;
+            text-align: center;
+            font-weight: 600;
+            color: #64ffda;
+        }
+        
+        .upload-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .upload-btn {
+            background-color: #64ffda;
+            color: #1a1a2e;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 1rem;
+        }
+        
+        .upload-btn:hover {
+            background-color: #4fd1b8;
+            transform: translateY(-2px);
+        }
+        
+        .file-info {
+            font-size: 0.9rem;
+            color: #c5c5c5;
+            margin-top: 0.5rem;
+        }
+        
+        .canvas-container {
+            width: 100%;
+            position: relative;
+            aspect-ratio: 16/9;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: rgba(0, 0, 0, 0.2);
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 1.5rem;
+            gap: 1rem;
+        }
+        
+        .control-btn {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #fff;
+            border-radius: 50px;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .control-btn:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .control-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+        
+        #playPauseBtn {
+            width: 60px;
+            height: 60px;
+            background-color: #64ffda;
+            color: #1a1a2e;
+        }
+        
+        #playPauseBtn:hover {
+            background-color: #4fd1b8;
+            transform: scale(1.05);
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .visualizer-mode {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+            gap: 0.5rem;
+        }
+        
+        .mode-btn {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #fff;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .mode-btn.active {
+            background-color: #64ffda;
+            color: #1a1a2e;
+        }
+        
+        .drop-area {
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-bottom: 1rem;
+        }
+        
+        .drop-area.active {
+            border-color: #64ffda;
+            background-color: rgba(100, 255, 218, 0.1);
+        }
+        
+        .drop-area p {
+            margin-bottom: 1rem;
+            color: #c5c5c5;
+        }
+        
+        #audioFileInput {
+            display: none;
+        }
+        
+        .progress-container {
+            width: 100%;
+            height: 4px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            margin-top: 1rem;
+            overflow: hidden;
+            cursor: pointer;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background-color: #64ffda;
+            width: 0;
+            transition: width 0.1s linear;
+        }
+        
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            font-size: 0.8rem;
+            color: #c5c5c5;
+            margin-top: 0.25rem;
+        }
+        
+        .info-box {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid #64ffda;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 4px 4px 0;
+        }
+        
+        .info-box h3 {
+            margin-bottom: 0.5rem;
+            color: #64ffda;
+        }
+        
+        .file-types {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .file-type {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        
+        .input-tabs {
+            display: flex;
+            width: 100%;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .input-tab {
+            padding: 0.8rem 1.5rem;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .input-tab.active {
+            border-bottom-color: #64ffda;
+            color: #64ffda;
+        }
+        
+        .input-content {
+            display: none;
+            width: 100%;
+        }
+        
+        .input-content.active {
+            display: block;
+        }
+        
+        #demoSelector {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            width: 100%;
+            cursor: pointer;
+        }
+        
+        #demoSelector:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px #64ffda;
+        }
+        
+        .demo-btn {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .demo-btn:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        #song-info {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .album-art {
+            width: 60px;
+            height: 60px;
+            border-radius: 4px;
+            margin-right: 1rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .album-art svg {
+            width: 30px;
+            height: 30px;
+            fill: rgba(255, 255, 255, 0.6);
+        }
+        
+        .song-details h4 {
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;
+        }
+        
+        .song-details p {
+            font-size: 0.8rem;
+            color: #c5c5c5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Visualizador de Ondas Sonoras</h1>
+        
+        <div class="upload-container">
+            <div class="input-tabs">
+                <div class="input-tab active" data-tab="file-tab">Enviar Arquivo</div>
+                <div class="input-tab" data-tab="demo-tab">Faixas Demo</div>
+            </div>
+            
+            <div class="input-content active" id="file-tab">
+                <div class="info-box">
+                    <h3>Formatos suportados</h3>
+                    <p>Carregue um arquivo de áudio para ver a visualização das ondas sonoras.</p>
+                    <div class="file-types">
+                        <span class="file-type">MP3</span>
+                        <span class="file-type">WAV</span>
+                        <span class="file-type">OGG</span>
+                        <span class="file-type">AAC</span>
+                        <span class="file-type">FLAC</span>
+                    </div>
+                </div>
+                
+                <div class="drop-area" id="dropArea">
+                    <p>Arraste e solte um arquivo de áudio aqui ou</p>
+                    <button class="upload-btn" id="uploadBtn">Escolher Arquivo</button>
+                    <input type="file" id="audioFileInput" accept="audio/*">
+                    <div class="file-info" id="fileInfo"></div>
+                </div>
+            </div>
+            
+            <div class="input-content" id="demo-tab">
+                <p>Escolha uma das faixas demo abaixo para visualizar:</p>
+                <select id="demoSelector">
+                    <option value="">Selecione uma faixa...</option>
+                    <option value="demo1">Batida Eletrônica</option>
+                    <option value="demo2">Piano Clássico</option>
+                    <option value="demo3">Guitarra Acústica</option>
+                </select>
+                
+                <div id="song-info" class="hidden">
+                    <div class="album-art">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                        </svg>
+                    </div>
+                    <div class="song-details">
+                        <h4 id="song-title">Título da Música</h4>
+                        <p id="song-artist">Artista</p>
+                    </div>
+                </div>
+                
+                <button class="demo-btn" id="loadDemoBtn">Carregar Faixa Demo</button>
+            </div>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="visualizer"></canvas>
+        </div>
+        
+        <div class="controls hidden" id="audioControls">
+            <button class="control-btn" id="rewindBtn">
+                <svg viewBox="0 0 24 24"><path d="M11.5 12l8.5 6V6l-8.5 6zm-9 0l8.5 6V6L2.5 12z"/></svg>
+            </button>
+            
+            <button class="control-btn" id="playPauseBtn">
+                <svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7L8 5z"/></svg>
+                <svg viewBox="0 0 24 24" id="pauseIcon" class="hidden"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </button>
+            
+            <button class="control-btn" id="forwardBtn">
+                <svg viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg>
+            </button>
+        </div>
+        
+        <div class="progress-container hidden" id="progressContainer">
+            <div class="progress-bar" id="progressBar"></div>
+            <div class="time-display">
+                <span id="currentTime">0:00</span>
+                <span id="totalTime">0:00</span>
+            </div>
+        </div>
+        
+        <div class="visualizer-mode hidden" id="visualizerModes">
+            <button class="mode-btn active" data-mode="waveform">Onda</button>
+            <button class="mode-btn" data-mode="frequency">Frequência</button>
+            <button class="mode-btn" data-mode="circular">Circular</button>
+            <button class="mode-btn" data-mode="bars">Barras</button>
+            <button class="mode-btn" data-mode="particles">Partículas</button>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elements
+            const audioFileInput = document.getElementById('audioFileInput');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const fileInfo = document.getElementById('fileInfo');
+            const visualizer = document.getElementById('visualizer');
+            const dropArea = document.getElementById('dropArea');
+            const audioControls = document.getElementById('audioControls');
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            const playIcon = document.getElementById('playIcon');
+            const pauseIcon = document.getElementById('pauseIcon');
+            const rewindBtn = document.getElementById('rewindBtn');
+            const forwardBtn = document.getElementById('forwardBtn');
+            const progressBar = document.getElementById('progressBar');
+            const progressContainer = document.getElementById('progressContainer');
+            const currentTimeDisplay = document.getElementById('currentTime');
+            const totalTimeDisplay = document.getElementById('totalTime');
+            const visualizerModes = document.getElementById('visualizerModes');
+            const modeBtns = document.querySelectorAll('.mode-btn');
+            const inputTabs = document.querySelectorAll('.input-tab');
+            const inputContents = document.querySelectorAll('.input-content');
+            const demoSelector = document.getElementById('demoSelector');
+            const loadDemoBtn = document.getElementById('loadDemoBtn');
+            const songInfo = document.getElementById('song-info');
+            const songTitle = document.getElementById('song-title');
+            const songArtist = document.getElementById('song-artist');
+            
+            // Setup
+            const ctx = visualizer.getContext('2d');
+            let audioContext;
+            let audioSource;
+            let analyser;
+            let audio = new Audio();
+            let audioBuffer;
+            let rafId;
+            let isPlaying = false;
+            let currentMode = 'waveform';
+            let particles = [];
+            
+            // Demo tracks
+            const demoTracks = {
+                demo1: {
+                    url: 'https://samplelib.com/lib/preview/mp3/sample-15s.mp3',
+                    title: 'Batida Eletrônica Demo',
+                    artist: 'Sample Library'
+                },
+                demo2: {
+                    url: 'https://samplelib.com/lib/preview/mp3/sample-12s.mp3',
+                    title: 'Piano Clássico Demo',
+                    artist: 'Sample Library'
+                },
+                demo3: {
+                    url: 'https://samplelib.com/lib/preview/mp3/sample-9s.mp3',
+                    title: 'Guitarra Acústica Demo',
+                    artist: 'Sample Library'
+                }
+            };
+            
+            // Canvas dimensions
+            function setupCanvas() {
+                visualizer.width = visualizer.offsetWidth * window.devicePixelRatio;
+                visualizer.height = visualizer.offsetHeight * window.devicePixelRatio;
+                ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            }
+            
+            // Initialize
+            setupCanvas();
+            window.addEventListener('resize', setupCanvas);
+            
+            // Tab switching
+            inputTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Remove active class from all tabs and contents
+                    inputTabs.forEach(t => t.classList.remove('active'));
+                    inputContents.forEach(c => c.classList.remove('active'));
+                    
+                    // Add active class to clicked tab
+                    tab.classList.add('active');
+                    
+                    // Add active class to corresponding content
+                    const tabId = tab.dataset.tab;
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+            
+            // File upload handling
+            uploadBtn.addEventListener('click', () => {
+                audioFileInput.click();
+            });
+            
+            audioFileInput.addEventListener('change', handleFileSelect);
+            
+            // Demo track handling
+            loadDemoBtn.addEventListener('click', () => {
+                const selected = demoSelector.value;
+                if (selected && demoTracks[selected]) {
+                    loadDemoTrack(demoTracks[selected]);
+                } else {
+                    alert('Por favor, selecione uma faixa demo.');
+                }
+            });
+            
+            function loadDemoTrack(track) {
+                // Reset audio state
+                resetAudio();
+                
+                // Set track info
+                songTitle.textContent = track.title;
+                songArtist.textContent = track.artist;
+                songInfo.classList.remove('hidden');
+                
+                // Load audio
+                audio.src = track.url;
+                audio.load();
+                
+                // Set up audio processing once loaded
+                audio.addEventListener('loadedmetadata', () => {
+                    setupAudioProcessing();
+                    
+                    // Set total time
+                    totalTimeDisplay.textContent = formatTime(audio.duration);
+                    
+                    // Show controls
+                    audioControls.classList.remove('hidden');
+                    progressContainer.classList.remove('hidden');
+                    visualizerModes.classList.remove('hidden');
+                    
+                    // Auto play
+                    playAudio();
+                });
+                
+                // Handle errors
+                audio.addEventListener('error', () => {
+                    alert('Erro ao carregar a faixa demo. Por favor, tente novamente ou escolha outra faixa.');
+                });
+            }
+            
+            // Drag and drop
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                dropArea.classList.add('active');
+            }
+            
+            function unhighlight() {
+                dropArea.classList.remove('active');
+            }
+            
+            dropArea.addEventListener('drop', handleDrop, false);
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length && files[0].type.startsWith('audio/')) {
+                    handleFileSelect({ target: { files } });
+                }
+            }
+            
+            // File selection handler
+            function handleFileSelect(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                if (!file.type.startsWith('audio/')) {
+                    alert('Por favor, selecione um arquivo de áudio.');
+                    return;
+                }
+                
+                // Reset previous setup
+                resetAudio();
+                
+                // Display file info
+                fileInfo.textContent = `${file.name} (${formatFileSize(file.size)})`;
+                
+                // Read file
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const arrayBuffer = event.target.result;
+                    setupAudioFile(arrayBuffer, file.type);
+                };
+                reader.readAsArrayBuffer(file);
+            }
+            
+            // Reset audio state
+            function resetAudio() {
+                if (isPlaying) {
+                    pauseAudio();
+                }
+                
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                }
+                
+                // Reset audio element
+                audio.pause();
+                audio.src = '';
+                
+                // Reset progress
+                progressBar.style.width = '0%';
+                currentTimeDisplay.textContent = '0:00';
+                totalTimeDisplay.textContent = '0:00';
+                
+                // Clear file info
+                fileInfo.textContent = '';
+                
+                // Reset particles
+                particles = [];
+            }
+            
+            // Format file size
+            function formatFileSize(bytes) {
+                if (bytes < 1024) return bytes + ' bytes';
+                else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                else return (bytes / 1048576).toFixed(1) + ' MB';
+            }
+            
+            // Setup audio processing
+            function setupAudioProcessing() {
+                // Init Web Audio API if not already initialized
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                if (!analyser) {
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 2048;
+                }
+                
+                // Connect audio to analyser if not already connected
+                if (audioSource) {
+                    audioSource.disconnect();
+                }
+                
+                audioSource = audioContext.createMediaElementSource(audio);
+                audioSource.connect(analyser);
+                analyser.connect(audioContext.destination);
+                
+                // Update progress bar
+                audio.addEventListener('timeupdate', updateProgress);
+                
+                // Track when audio ends
+                audio.addEventListener('ended', () => {
+                    pauseAudio();
+                    progressBar.style.width = '0%';
+                    currentTimeDisplay.textContent = '0:00';
+                });
+            }
+            
+            // Setup audio from file
+            function setupAudioFile(arrayBuffer, mimeType) {
+                // Create blob URL
+                const blob = new Blob([arrayBuffer], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                audio.src = url;
+                
+                // Once audio metadata is loaded
+                audio.addEventListener('loadedmetadata', () => {
+                    // Setup audio processing
+                    setupAudioProcessing();
+                    
+                    // Set total time
+                    totalTimeDisplay.textContent = formatTime(audio.duration);
+                    
+                    // Show controls
+                    audioControls.classList.remove('hidden');
+                    progressContainer.classList.remove('hidden');
+                    visualizerModes.classList.remove('hidden');
+                    
+                    // Auto play
+                    playAudio();
+                });
+                
+                // Handle errors
+                audio.addEventListener('error', () => {
+                    alert('Erro ao processar o arquivo de áudio. Por favor, tente outro arquivo.');
+                });
+                
+                // Load the audio
+                audio.load();
+            }
+            
+            // Play audio
+            function playAudio() {
+                if (audioContext && audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                
+                audio.play()
+                    .then(() => {
+                        isPlaying = true;
+                        playIcon.classList.add('hidden');
+                        pauseIcon.classList.remove('hidden');
+                        visualize();
+                    })
+                    .catch(error => {
+                        console.error('Erro ao reproduzir áudio:', error);
+                        alert('Não foi possível reproduzir o áudio. Verifique se o arquivo é válido.');
+                    });
+            }
+            
+            // Pause audio
+            function pauseAudio() {
+                audio.pause();
+                isPlaying = false;
+                pauseIcon.classList.add('hidden');
+                playIcon.classList.remove('hidden');
+                
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                }
+            }
+            
+            // Format time
+            function formatTime(seconds) {
+                if (isNaN(seconds)) return '0:00';
+                const min = Math.floor(seconds / 60);
+                const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
+                return `${min}:${sec}`;
+            }
+            
+            // Update progress bar
+            function updateProgress() {
+                const percent = (audio.currentTime / audio.duration) * 100;
+                progressBar.style.width = `${percent}%`;
+                currentTimeDisplay.textContent = formatTime(audio.currentTime);
+            }
+            
+            // Control events
+            playPauseBtn.addEventListener('click', () => {
+                if (isPlaying) {
+                    pauseAudio();
+                } else {
+                    playAudio();
+                }
+            });
+            
+            rewindBtn.addEventListener('click', () => {
+                audio.currentTime = Math.max(0, audio.currentTime - 10);
+            });
+            
+            forwardBtn.addEventListener('click', () => {
+                audio.currentTime = Math.min(audio.duration, audio.currentTime + 10);
+            });
+            
+            // Visualization modes
+            modeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    modeBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentMode = btn.dataset.mode;
+                    
+                    // Initialize particles if switching to particle mode
+                    if (currentMode === 'particles') {
+                        initParticles();
+                    }
+                });
+            });
+            
+            // Click on progress bar to seek
+            progressContainer.addEventListener('click', (e) => {
+                const rect = progressContainer.getBoundingClientRect();
+                const pos = (e.clientX - rect.left) / rect.width;
+                audio.currentTime = pos * audio.duration;
+            });
+            
+            // Particles visualization
+            function initParticles() {
+                particles = [];
+                const numParticles = 100;
+                
+                for (let i = 0; i < numParticles; i++) {
+                    particles.push({
+                        x: Math.random() * visualizer.offsetWidth,
+                        y: Math.random() * visualizer.offsetHeight,
+                        size: Math.random() * 5 + 2,
+                        speed: Math.random() * 3 + 1,
+                        hue: Math.random() * 60 + 160, // Bluish to greenish
+                        opacity: Math.random() * 0.5 + 0.5
+                    });
+                }
+            }
+            
+            // Visualization function
+            function visualize() {
+                const width = visualizer.offsetWidth;
+                const height = visualizer.offsetHeight;
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, width, height);
+                
+                if (!analyser) return;
+                
+                // Create data arrays
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                
+                // Choose visualization based on mode
+                switch(currentMode) {
+                    case 'waveform':
+                        drawWaveform(width, height, bufferLength, dataArray);
+                        break;
+                    case 'frequency':
+                        drawFrequency(width, height, bufferLength, dataArray);
+                        break;
+                    case 'circular':
+                        drawCircular(width, height, bufferLength, dataArray);
+                        break;
+                    case 'bars':
+                        drawBars(width, height, bufferLength, dataArray);
+                        break;
+                    case 'particles':
+                        drawParticles(width, height, bufferLength, dataArray);
+                        break;
+                }
+                
+                // Continue animation loop
+                if (isPlaying) {
+                    rafId = requestAnimationFrame(visualize);
+                }
+            }
+            
+            // Waveform visualization
+            function drawWaveform(width, height, bufferLength, dataArray) {
+                analyser.getByteTimeDomainData(dataArray);
+                
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#64ffda';
+                ctx.beginPath();
+                
+                const sliceWidth = width / bufferLength;
+                let x = 0;
+                
+                for (let i = 0; i < bufferLength; i++) {
+                    const v = dataArray[i] / 128.0;
+                    const y = v * height / 2;
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                    
+                    x += sliceWidth;
+                }
+                
+                ctx.lineTo(width, height / 2);
+                ctx.stroke();
+                
+                // Add glow effect
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#64ffda';
+            }
+            
+            // Frequency visualization
+            function drawFrequency(width, height, bufferLength, dataArray) {
+                analyser.getByteFrequencyData(dataArray);
+                
+                const barWidth = width / bufferLength * 2.5;
+                let x = 0;
+                
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = (dataArray[i] / 255) * height;
+                    
+                    // Create gradient
+                    const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight);
+                    gradient.addColorStop(0, '#16213e');
+                    gradient.addColorStop(1, '#64ffda');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x, height - barHeight, barWidth, barHeight);
+                    
+                    x += barWidth + 1;
+                    if (x > width) break;
+                }
+            }
+            
+            // Circular visualization
+            function drawCircular(width, height, bufferLength, dataArray) {
+                analyser.getByteFrequencyData(dataArray);
+                
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const radius = Math.min(width, height) / 4;
+                
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                // Draw circular bars
+                for (let i = 0; i < bufferLength; i++) {
+                    if (i % 8 !== 0) continue; // Skip some data points for better visualization
+                    
+                    const value = dataArray[i] / 255;
+                    const angle = (i / bufferLength) * 2 * Math.PI;
+                    
+                    const innerRadius = radius;
+                    const outerRadius = radius + value * radius * 1.5;
+                    
+                    const startX = centerX + innerRadius * Math.cos(angle);
+                    const startY = centerY + innerRadius * Math.sin(angle);
+                    const endX = centerX + outerRadius * Math.cos(angle);
+                    const endY = centerY + outerRadius * Math.sin(angle);
+                    
+                    // Create gradient line
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    
+                    // Color based on frequency
+                    const hue = (i / bufferLength) * 360;
+                    ctx.strokeStyle = `hsl(${hue}, 80%, 60%)`;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            }
+            
+            // Bars visualization
+            function drawBars(width, height, bufferLength, dataArray) {
+                analyser.getByteFrequencyData(dataArray);
+                
+                // Only use a portion of the frequency data
+                const usableLength = bufferLength / 4;
+                const barWidth = width / usableLength;
+                
+                for (let i = 0; i < usableLength; i++) {
+                    const barHeight = (dataArray[i] / 255) * height;
+                    
+                    // Calculate mirror position for symmetry
+                    const mirrorPos = usableLength - i - 1;
+                    
+                    // Draw left bar
+                    ctx.fillStyle = `hsl(${180 + i / usableLength * 180}, 80%, 50%)`;
+                    ctx.fillRect(i * barWidth, height - barHeight, barWidth - 1, barHeight);
+                    
+                    // Draw right bar (mirrored)
+                    ctx.fillStyle = `hsl(${180 + mirrorPos / usableLength * 180}, 80%, 50%)`;
+                    ctx.fillRect(width - (i * barWidth) - barWidth, height - barHeight, barWidth - 1, barHeight);
+                }
+            }
+            
+            // Particles visualization
+            function drawParticles(width, height, bufferLength, dataArray) {
+                analyser.getByteFrequencyData(dataArray);
+                
+                // Initialize particles if they don't exist
+                if (particles.length === 0) {
+                    initParticles();
+                }
+                
+                // Get average frequency value for particle speed/size modulation
+                let sum = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    sum += dataArray[i];
+                }
+                const average = sum / bufferLength;
+                const amplification = average / 128; // Value between 0-2 approximately
+                
+                // Update and draw particles
+                for (let i = 0; i < particles.length; i++) {
+                    const p = particles[i];
+                    
+                    // Modulate size and speed based on audio
+                    const modSize = p.size * (1 + amplification * 0.5);
+                    const modSpeed = p.speed * (1 + amplification * 0.8);
+                    
+                    // Update position
+                    p.y -= modSpeed;
+                    
+                    // Reset particle if it's off screen
+                    if (p.y < -modSize) {
+                        p.y = height + modSize;
+                        p.x = Math.random() * width;
+                    }
+                    
+                    // Draw particle
+                    ctx.fillStyle = `hsla(${p.hue}, 100%, 60%, ${p.opacity * amplification})`;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, modSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

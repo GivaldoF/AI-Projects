@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ant Colony Image Former</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #111;
+            font-family: Arial, sans-serif;
+            color: #fff;
+        }
+        #canvas-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #upload-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+        }
+        #upload-label {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #upload-label:hover {
+            background-color: #45a049;
+        }
+        #image-upload {
+            display: none;
+        }
+        .instructions {
+            font-size: 14px;
+            margin-top: 10px;
+            color: #ccc;
+        }
+        #debug-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 12px;
+        }
+        #config-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            width: 250px;
+        }
+        .config-group {
+            margin-bottom: 15px;
+        }
+        .config-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        .slider-container {
+            margin-bottom: 8px;
+        }
+        .slider-container label {
+            display: block;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .slider-container span {
+            color: #aaa;
+        }
+        input[type="range"] {
+            width: 100%;
+            background: #333;
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #toggle-config {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 11;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <canvas id="canvas"></canvas>
+    </div>
+    <div id="upload-container">
+        <label id="upload-label" for="image-upload">Upload Image</label>
+        <input type="file" id="image-upload" accept="image/*">
+        <div class="instructions">
+            Clique e arraste para interagir com as formigas
+        </div>
+    </div>
+    <div id="debug-info"></div>
+    
+    <button id="toggle-config">⚙️ Configurações</button>
+    
+    <div id="config-panel">
+        <div class="config-title">Configurações</div>
+        
+        <div class="config-group">
+            <div class="slider-container">
+                <label>Quantidade de Partículas <span id="particle-count-value">1200</span></label>
+                <input type="range" id="particle-count" min="100" max="5000" value="1200" step="100">
+            </div>
+            
+            <div class="slider-container">
+                <label>Tamanho das Partículas <span id="particle-size-value">3</span></label>
+                <input type="range" id="particle-size" min="1" max="8" value="3" step="0.5">
+            </div>
+            
+            <div class="slider-container">
+                <label>Velocidade de Movimento <span id="movement-speed-value">1</span></label>
+                <input type="range" id="movement-speed" min="0.2" max="3" value="1" step="0.1">
+            </div>
+        </div>
+        
+        <div class="config-group">
+            <div class="slider-container">
+                <label>Força de Repulsão <span id="repulsion-force-value">1</span></label>
+                <input type="range" id="repulsion-force" min="0.2" max="3" value="1" step="0.1">
+            </div>
+            
+            <div class="slider-container">
+                <label>Raio de Repulsão <span id="repulsion-radius-value">100</span></label>
+                <input type="range" id="repulsion-radius" min="20" max="300" value="100" step="10">
+            </div>
+        </div>
+        
+        <div class="config-group">
+            <button id="reset-config">Resetar Configurações</button>
+            <button id="apply-config">Aplicar</button>
+        </div>
+    </div>
+
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const uploadInput = document.getElementById('image-upload');
+        const debugInfo = document.getElementById('debug-info');
+        
+        // Configuration elements
+        const configPanel = document.getElementById('config-panel');
+        const toggleConfig = document.getElementById('toggle-config');
+        const resetConfigBtn = document.getElementById('reset-config');
+        const applyConfigBtn = document.getElementById('apply-config');
+        
+        // Configuration sliders
+        const particleCountSlider = document.getElementById('particle-count');
+        const particleSizeSlider = document.getElementById('particle-size');
+        const movementSpeedSlider = document.getElementById('movement-speed');
+        const repulsionForceSlider = document.getElementById('repulsion-force');
+        const repulsionRadiusSlider = document.getElementById('repulsion-radius');
+        
+        // Configuration values displays
+        const particleCountValue = document.getElementById('particle-count-value');
+        const particleSizeValue = document.getElementById('particle-size-value');
+        const movementSpeedValue = document.getElementById('movement-speed-value');
+        const repulsionForceValue = document.getElementById('repulsion-force-value');
+        const repulsionRadiusValue = document.getElementById('repulsion-radius-value');
+        
+        // Set canvas size
+        let canvasWidth = window.innerWidth;
+        let canvasHeight = window.innerHeight;
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        
+        // App configuration
+        const config = {
+            maxParticles: 1200,
+            particleRadius: 3,
+            movementSpeedFactor: 1,
+            repulsionForce: 1,
+            repulsionRadius: 100
+        };
+        
+        // Show/hide config panel
+        toggleConfig.addEventListener('click', function() {
+            configPanel.style.display = configPanel.style.display === 'none' ? 'block' : 'none';
+            toggleConfig.style.display = configPanel.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        // Initially hide the config panel
+        configPanel.style.display = 'none';
+        
+        // Update slider value displays
+        function updateSliderDisplays() {
+            particleCountValue.textContent = config.maxParticles;
+            particleSizeValue.textContent = config.particleRadius;
+            movementSpeedValue.textContent = config.movementSpeedFactor;
+            repulsionForceValue.textContent = config.repulsionForce;
+            repulsionRadiusValue.textContent = config.repulsionRadius;
+            
+            // Update slider positions
+            particleCountSlider.value = config.maxParticles;
+            particleSizeSlider.value = config.particleRadius;
+            movementSpeedSlider.value = config.movementSpeedFactor;
+            repulsionForceSlider.value = config.repulsionForce;
+            repulsionRadiusSlider.value = config.repulsionRadius;
+        }
+        
+        // Live update values while sliding
+        particleCountSlider.addEventListener('input', function() {
+            particleCountValue.textContent = this.value;
+        });
+        
+        particleSizeSlider.addEventListener('input', function() {
+            particleSizeValue.textContent = this.value;
+        });
+        
+        movementSpeedSlider.addEventListener('input', function() {
+            movementSpeedValue.textContent = this.value;
+        });
+        
+        repulsionForceSlider.addEventListener('input', function() {
+            repulsionForceValue.textContent = this.value;
+        });
+        
+        repulsionRadiusSlider.addEventListener('input', function() {
+            repulsionRadiusValue.textContent = this.value;
+        });
+        
+        // Apply configuration
+        applyConfigBtn.addEventListener('click', function() {
+            // Store old particle count for comparison
+            const oldMaxParticles = config.maxParticles;
+            
+            // Update configuration
+            config.maxParticles = parseInt(particleCountSlider.value);
+            config.particleRadius = parseFloat(particleSizeSlider.value);
+            config.movementSpeedFactor = parseFloat(movementSpeedSlider.value);
+            config.repulsionForce = parseFloat(repulsionForceSlider.value);
+            config.repulsionRadius = parseInt(repulsionRadiusSlider.value);
+            
+            // Update all particles with new size
+            for (const ant of particles) {
+                ant.radius = config.particleRadius;
+                ant.moveSpeed = 0.3 * config.movementSpeedFactor + Math.random() * 0.2 * config.movementSpeedFactor;
+                ant.maxSpeed = 3 * config.movementSpeedFactor;
+            }
+            
+            // If we have an image and the particle count changed, reprocess
+            if (targetImage && oldMaxParticles !== config.maxParticles) {
+                const newTargetPositions = processImage(targetImage);
+                transformAnts(newTargetPositions);
+            }
+            
+            // Hide the config panel
+            configPanel.style.display = 'none';
+            toggleConfig.style.display = 'block';
+        });
+        
+        // Reset configuration
+        resetConfigBtn.addEventListener('click', function() {
+            config.maxParticles = 1200;
+            config.particleRadius = 3;
+            config.movementSpeedFactor = 1;
+            config.repulsionForce = 1;
+            config.repulsionRadius = 100;
+            
+            updateSliderDisplays();
+        });
+        
+        // Constants
+        const NEST_X = 100;
+        const NEST_Y = canvasHeight / 2;
+        const NEST_RADIUS = 20;
+        
+        // Variables
+        let particles = [];
+        let targetPositions = [];
+        let targetImage = null;
+        let isFirstImage = true;
+        let lastTimestamp = 0;
+        
+        // Ant class - simplified with direct movement approach
+        class Ant {
+            constructor(targetX, targetY, color) {
+                // Start at the nest
+                this.x = NEST_X;
+                this.y = NEST_Y;
+                
+                // Pre-defined target position
+                this.targetX = targetX;
+                this.targetY = targetY;
+                
+                // Appearance
+                this.radius = config.particleRadius;
+                this.color = color;
+                
+                // State - simplified to just 3 states
+                this.state = "emerging"; // emerging, moving, standby
+                this.emergingProgress = 0;
+                
+                // Direct movement parameters
+                this.moveSpeed = 0.5 * config.movementSpeedFactor + Math.random() * 0.2 * config.movementSpeedFactor;
+                this.emergingSpeed = 0.006 * config.movementSpeedFactor + Math.random() * 0.003 * config.movementSpeedFactor;
+                this.maxSpeed = 4 * config.movementSpeedFactor;
+                
+                // Interaction state
+                this.disturbance = 0;
+                
+                // Movement
+                this.vx = 0;
+                this.vy = 0;
+                
+                // Store in global array
+                particles.push(this);
+            }
+            
+            update(deltaTime) {
+                // Handle state-based behavior
+                switch (this.state) {
+                    case "emerging":
+                        this.handleEmerging(deltaTime);
+                        break;
+                    case "moving":
+                        this.handleMoving(deltaTime);
+                        break;
+                    case "standby":
+                        // In standby, only update if disturbed
+                        if (this.disturbance > 0.1) {
+                            this.state = "moving";
+                            this.handleMoving(deltaTime);
+                        } else {
+                            // Skip unnecessary updates for better performance
+                            return;
+                        }
+                        break;
+                }
+                
+                // Apply velocity (with deltaTime for consistent speed)
+                if (this.state !== "standby") {
+                    this.x += this.vx * (deltaTime / 16);
+                    this.y += this.vy * (deltaTime / 16);
+                    
+                    // Make sure ants stay on screen
+                    this.x = Math.max(0, Math.min(canvasWidth, this.x));
+                    this.y = Math.max(0, Math.min(canvasHeight, this.y));
+                }
+                
+                // Gradually reduce disturbance
+                if (this.disturbance > 0) {
+                    this.disturbance *= 0.9; // Fast reduction
+                    if (this.disturbance < 0.02) this.disturbance = 0;
+                }
+            }
+            
+            handleEmerging(deltaTime) {
+                // Gradually move out from nest
+                this.emergingProgress += this.emergingSpeed * deltaTime;
+                
+                if (this.emergingProgress >= 1) {
+                    // Transition directly to moving state
+                    this.state = "moving";
+                    return;
+                }
+                
+                // Direct path from nest toward target
+                const moveVector = {
+                    x: this.targetX - NEST_X,
+                    y: this.targetY - NEST_Y
+                };
+                
+                // Normalize the vector
+                const distance = Math.sqrt(moveVector.x * moveVector.x + moveVector.y * moveVector.y);
+                moveVector.x /= distance;
+                moveVector.y /= distance;
+                
+                // Apply smooth easing
+                const easing = Math.sin(this.emergingProgress * Math.PI / 2);
+                const moveDistance = 50 * easing;
+                
+                this.x = NEST_X + moveVector.x * moveDistance;
+                this.y = NEST_Y + moveVector.y * moveDistance;
+                
+                // Minimal wiggle during emergence
+                this.x += (Math.random() - 0.5);
+                this.y += (Math.random() - 0.5);
+            }
+            
+            handleMoving(deltaTime) {
+                // Direct path to target
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+                const squareDistance = dx * dx + dy * dy;
+                
+                // Fast check for arrival (without sqrt for performance)
+                if (squareDistance < 16 && this.disturbance < 0.1) { // 4^2 = 16
+                    this.state = "standby";
+                    
+                    // Snap to exact position for perfect formation
+                    this.x = this.targetX;
+                    this.y = this.targetY;
+                    
+                    // Stop movement
+                    this.vx = 0;
+                    this.vy = 0;
+                    return;
+                }
+                
+                const distance = Math.sqrt(squareDistance);
+                
+                // Direct velocity calculation
+                // Faster when far, more precise when close
+                const speedFactor = Math.min(1, distance / 100);
+                const speedMultiplier = 1 + speedFactor * 3;
+                
+                // Calculate target velocity
+                let targetVx = (dx / distance) * this.moveSpeed * speedMultiplier;
+                let targetVy = (dy / distance) * this.moveSpeed * speedMultiplier;
+                
+                // Clamp maximum speed
+                const targetSpeed = Math.sqrt(targetVx * targetVx + targetVy * targetVy);
+                if (targetSpeed > this.maxSpeed) {
+                    const speedRatio = this.maxSpeed / targetSpeed;
+                    targetVx *= speedRatio;
+                    targetVy *= speedRatio;
+                }
+                
+                // Minimal randomness for natural movement
+                const randomFactor = 0.05 + this.disturbance;
+                targetVx += (Math.random() - 0.5) * randomFactor;
+                targetVy += (Math.random() - 0.5) * randomFactor;
+                
+                // Smooth acceleration
+                const smoothFactor = 0.2 + (this.disturbance * 0.3);
+                this.vx = this.vx * (1 - smoothFactor) + targetVx * smoothFactor;
+                this.vy = this.vy * (1 - smoothFactor) + targetVy * smoothFactor;
+                
+                // Simplified collision avoidance - only when necessary
+                if (Math.random() < 0.3) { // 30% chance to avoid collisions per frame
+                    this.avoidCollisions();
+                }
+            }
+            
+            avoidCollisions() {
+                // Very simplified collision avoidance for better performance
+                const avoidRadius = 10;
+                const sampleSize = 5; // Check very few nearby ants
+                
+                for (let i = 0; i < sampleSize; i++) {
+                    const randomIndex = Math.floor(Math.random() * particles.length);
+                    const other = particles[randomIndex];
+                    
+                    if (other === this || other.state === "emerging") continue;
+                    
+                    // Fast squared distance check
+                    const dx = this.x - other.x;
+                    const dy = this.y - other.y;
+                    const squareDist = dx * dx + dy * dy;
+                    
+                    if (squareDist < avoidRadius * avoidRadius) {
+                        const distance = Math.sqrt(squareDist);
+                        // Apply stronger but simpler repulsion
+                        const force = 0.3 * (avoidRadius - distance) / avoidRadius;
+                        this.vx += (dx / distance) * force;
+                        this.vy += (dy / distance) * force;
+                        break; // Only handle one collision per frame
+                    }
+                }
+            }
+            
+            disturb(amount, sourceX, sourceY) {
+                // Don't disturb emerging ants
+                if (this.state === "emerging") return;
+                
+                // Set disturbance
+                this.disturbance = Math.max(this.disturbance, amount * 1.5);
+                
+                // Push away from disturbance source
+                const dx = this.x - sourceX;
+                const dy = this.y - sourceY;
+                const squareDist = dx * dx + dy * dy;
+                
+                if (squareDist > 0) {
+                    const distance = Math.sqrt(squareDist);
+                    // Apply push force with config factor
+                    const pushForce = 8 * amount * config.repulsionForce;
+                    this.vx += (dx / distance) * pushForce;
+                    this.vy += (dy / distance) * pushForce;
+                    
+                    // Add minimal randomness
+                    this.vx += (Math.random() - 0.5) * amount * config.repulsionForce;
+                    this.vy += (Math.random() - 0.5) * amount * config.repulsionForce;
+                }
+                
+                // Change state to moving if in standby
+                if (this.state === "standby") {
+                    this.state = "moving";
+                }
+            }
+            
+            returnToNest() {
+                // Set target to nest position
+                this.targetX = NEST_X;
+                this.targetY = NEST_Y;
+                this.state = "moving";
+                this.disturbance = 0.3;
+            }
+            
+            draw() {
+                // Skip drawing off-screen ants
+                if (this.x < -10 || this.x > canvasWidth + 10 || 
+                    this.y < -10 || this.y > canvasHeight + 10) {
+                    return;
+                }
+                
+                ctx.beginPath();
+                
+                // Simple drawing with minimal effects
+                const radius = this.disturbance > 0.2 ? 
+                    this.radius * (1 + (Math.sin(Date.now() * 0.01) * 0.1)) : 
+                    this.radius;
+                
+                ctx.arc(this.x, this.y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Only add outlines for disturbed ants
+                if (this.disturbance > 0.2) {
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            }
+        }
+        
+        // Process image and create target positions
+        function processImage(image) {
+            // Create a temporary canvas to process the image
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Calculate scaling to fit the canvas
+            const maxWidth = canvasWidth * 0.6;
+            const maxHeight = canvasHeight * 0.6;
+            let width = image.width;
+            let height = image.height;
+            
+            const aspectRatio = width / height;
+            
+            if (width > maxWidth) {
+                width = maxWidth;
+                height = width / aspectRatio;
+            }
+            
+            if (height > maxHeight) {
+                height = maxHeight;
+                width = height * aspectRatio;
+            }
+            
+            tempCanvas.width = width;
+            tempCanvas.height = height;
+            
+            // Draw the image on the temporary canvas
+            tempCtx.drawImage(image, 0, 0, width, height);
+            
+            // Get image data
+            const imageData = tempCtx.getImageData(0, 0, width, height);
+            const data = imageData.data;
+            
+            // Calculate appropriate sampling rate based on image size
+            // Increased sampling rate (fewer particles) for better performance
+            const pixelCount = width * height;
+            const maxParticleCount = 1200; // Reduced from 2000 for better performance
+            let sampleRate = Math.ceil(Math.sqrt(pixelCount / maxParticleCount));
+            sampleRate = Math.max(2, sampleRate); // Minimum sample rate of 2 for better performance
+            
+            let newTargetPositions = [];
+            
+            // Sample pixels
+            for (let y = 0; y < height; y += sampleRate) {
+                for (let x = 0; x < width; x += sampleRate) {
+                    const i = (y * width + x) * 4;
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const a = data[i + 3];
+                    
+                    // Skip transparent or very light pixels (improved threshold)
+                    if (a < 100 || (r > 230 && g > 230 && b > 230)) continue;
+                    
+                    // Calculate canvas position (centered)
+                    const canvasX = Math.floor((canvasWidth - width) / 2 + x);
+                    const canvasY = Math.floor((canvasHeight - height) / 2 + y);
+                    
+                    newTargetPositions.push({
+                        x: canvasX,
+                        y: canvasY,
+                        color: `rgb(${r},${g},${b})`
+                    });
+                }
+            }
+            
+            // Shuffle to randomize assignment
+            shuffleArray(newTargetPositions);
+            
+            // Limit number of positions
+            const MAX_PARTICLES = maxParticleCount; // Constant for max particles
+            if (newTargetPositions.length > MAX_PARTICLES) {
+                newTargetPositions = newTargetPositions.slice(0, MAX_PARTICLES);
+            }
+            
+            // Update debug info
+            debugInfo.textContent = `Image: ${width}x${height}, Particles: ${newTargetPositions.length}, Sample rate: ${sampleRate}`;
+            
+            return newTargetPositions;
+        }
+        
+        // Fisher-Yates shuffle
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+        
+        // Create ants for the first time
+        function createAnts(targetPositions) {
+            // Clear existing ants
+            particles = [];
+            
+            // Store for reference
+            targetPositions = targetPositions;
+            
+            // Create new ants in batches
+            const batchSize = 30;
+            const batchDelay = 100;
+            
+            function createBatch(startIndex) {
+                const endIndex = Math.min(startIndex + batchSize, targetPositions.length);
+                
+                for (let i = startIndex; i < endIndex; i++) {
+                    const target = targetPositions[i];
+                    new Ant(target.x, target.y, target.color);
+                }
+                
+                if (endIndex < targetPositions.length) {
+                    setTimeout(() => createBatch(endIndex), batchDelay);
+                }
+            }
+            
+            createBatch(0);
+        }
+        
+        // Transform existing ants to new positions
+        function transformAnts(newTargetPositions) {
+            // If we have more ants than needed
+            if (particles.length > newTargetPositions.length) {
+                // Reassign existing ants
+                for (let i = 0; i < newTargetPositions.length; i++) {
+                    const target = newTargetPositions[i];
+                    const ant = particles[i];
+                    ant.targetX = target.x;
+                    ant.targetY = target.y;
+                    ant.color = target.color;
+                    ant.state = "moving";
+                }
+                
+                // Send excess ants back to nest
+                for (let i = newTargetPositions.length; i < particles.length; i++) {
+                    particles[i].returnToNest();
+                }
+            }
+            // If we need more ants
+            else if (particles.length < newTargetPositions.length) {
+                // Reassign existing ants
+                for (let i = 0; i < particles.length; i++) {
+                    const target = newTargetPositions[i];
+                    const ant = particles[i];
+                    ant.targetX = target.x;
+                    ant.targetY = target.y;
+                    ant.color = target.color;
+                    ant.state = "moving";
+                }
+                
+                // Create new ants for the remaining positions
+                const remainingTargets = newTargetPositions.slice(particles.length);
+                
+                // Create in batches
+                const batchSize = 20;
+                const batchDelay = 100;
+                
+                function createBatch(startIndex) {
+                    const endIndex = Math.min(startIndex + batchSize, remainingTargets.length);
+                    
+                    for (let i = startIndex; i < endIndex; i++) {
+                        const target = remainingTargets[i];
+                        new Ant(target.x, target.y, target.color);
+                    }
+                    
+                    if (endIndex < remainingTargets.length) {
+                        setTimeout(() => createBatch(endIndex), batchDelay);
+                    }
+                }
+                
+                createBatch(0);
+            }
+            // If we have exactly the right number
+            else {
+                for (let i = 0; i < particles.length; i++) {
+                    const target = newTargetPositions[i];
+                    const ant = particles[i];
+                    ant.targetX = target.x;
+                    ant.targetY = target.y;
+                    ant.color = target.color;
+                    ant.state = "moving";
+                }
+            }
+        }
+        
+        // Handle image upload
+        uploadInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            debugInfo.textContent = "Processando imagem...";
+            
+            // Use setTimeout to allow the UI to update before processing
+            setTimeout(() => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    
+                    img.onload = function() {
+                        // Pre-process image to determine all target positions
+                        targetImage = img;
+                        const newTargetPositions = processImage(img);
+                        debugInfo.textContent = `Imagem processada. Preparando ${newTargetPositions.length} partículas...`;
+                        
+                        // Small delay to allow UI update
+                        setTimeout(() => {
+                            if (isFirstImage) {
+                                // First image - create all new ants with pre-defined targets
+                                createAnts(newTargetPositions);
+                                isFirstImage = false;
+                            } else {
+                                // Transform existing ants to new positions
+                                transformAnts(newTargetPositions);
+                            }
+                            debugInfo.textContent = `Formando imagem com ${newTargetPositions.length} partículas...`;
+                        }, 50);
+                    };
+                    
+                    img.src = event.target.result;
+                };
+                
+                reader.readAsDataURL(file);
+            }, 50);
+        });
+        
+        // Handle user interaction - without ripple effect
+        canvas.addEventListener('mousedown', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            const handleDisturb = function(mx, my) {
+                const disturbRadius = config.repulsionRadius;
+                
+                // Optimization: Only disturb ants near the click point
+                for (const ant of particles) {
+                    // Quick distance check - faster than sqrt
+                    const dx = ant.x - mx;
+                    const dy = ant.y - my;
+                    const squareDistance = dx * dx + dy * dy;
+                    
+                    // Skip distant ants
+                    if (squareDistance > disturbRadius * disturbRadius) continue;
+                    
+                    // Calculate actual distance only for nearby ants
+                    const distance = Math.sqrt(squareDistance);
+                    
+                    if (distance < disturbRadius) {
+                        // Stronger effect closer to center
+                        const strength = Math.pow((disturbRadius - distance) / disturbRadius, 1.5) * config.repulsionForce;
+                        ant.disturb(strength, mx, my);
+                    }
+                }
+            };
+            
+            // Initial disturbance
+            handleDisturb(mouseX, mouseY);
+            
+            // Setup drag handling
+            const mouseMoveHandler = function(e) {
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                
+                // Throttle mouse move events for better performance
+                if (!mouseMoveHandler.lastTime || Date.now() - mouseMoveHandler.lastTime > 30) {
+                    handleDisturb(mx, my);
+                    mouseMoveHandler.lastTime = Date.now();
+                }
+            };
+            
+            const mouseUpHandler = function() {
+                canvas.removeEventListener('mousemove', mouseMoveHandler);
+                window.removeEventListener('mouseup', mouseUpHandler);
+            };
+            
+            canvas.addEventListener('mousemove', mouseMoveHandler);
+            window.addEventListener('mouseup', mouseUpHandler);
+        });
+        
+        // Draw nest
+        function drawNest() {
+            // Main nest circle
+            ctx.beginPath();
+            ctx.arc(NEST_X, NEST_Y, NEST_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = '#995511';
+            ctx.fill();
+            ctx.strokeStyle = '#CC6622';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Add some decoration
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                const x = NEST_X + Math.cos(angle) * (NEST_RADIUS * 1.3);
+                const y = NEST_Y + Math.sin(angle) * (NEST_RADIUS * 1.3);
+                
+                ctx.beginPath();
+                ctx.arc(x, y, 2 + Math.random() * 3, 0, Math.PI * 2);
+                ctx.fillStyle = '#AA6633';
+                ctx.fill();
+            }
+        }
+        
+        // Main animation loop
+        function animate(timestamp) {
+            // Calculate delta time for smooth animation
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const deltaTime = Math.min(timestamp - lastTimestamp, 50); // Cap delta time to avoid jumps
+            lastTimestamp = timestamp;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            
+            // Draw nest
+            drawNest();
+            
+            // Count ants in different states for stats
+            let movingCount = 0;
+            let standbyCount = 0;
+            let disturbedCount = 0;
+            
+            // Update and draw ants
+            for (let i = 0; i < particles.length; i++) {
+                const ant = particles[i];
+                
+                // Track states
+                if (ant.state === "moving") movingCount++;
+                if (ant.state === "standby") standbyCount++;
+                if (ant.disturbance > 0.1) disturbedCount++;
+                
+                // Performance optimization - update fewer standby ants
+                if (ant.state === "standby" && Math.random() > 0.1) {
+                    // Just draw without updating
+                    ant.draw();
+                    continue;
+                }
+                
+                // Normal update and draw for others
+                ant.update(deltaTime);
+                ant.draw();
+            }
+            
+            // Update debug info with formation status and performance
+            if (particles.length > 0) {
+                const percentComplete = Math.round((standbyCount / particles.length) * 100);
+                let statusText = ` | Formação: ${percentComplete}%`;
+                
+                // Add moving info
+                const movingPercent = Math.round((movingCount / particles.length) * 100);
+                statusText += ` | Em movimento: ${movingPercent}%`;
+                
+                // Add disturbance info if ants are disturbed
+                if (disturbedCount > 0) {
+                    const disturbedPercent = Math.round((disturbedCount / particles.length) * 100);
+                    statusText += ` | Perturbadas: ${disturbedPercent}%`;
+                }
+                
+                // Add FPS info
+                if (timestamp > 1000) {
+                    const fps = Math.round(1000 / Math.max(1, timestamp - lastTimestamp));
+                    statusText += ` | FPS: ${fps}`;
+                }
+                
+                debugInfo.textContent = debugInfo.textContent.split(' | ')[0] + statusText;
+            }
+            
+            // Continue animation
+            requestAnimationFrame(animate);
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            canvasWidth = window.innerWidth;
+            canvasHeight = window.innerHeight;
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            
+            // If we have an image, reprocess it
+            if (targetImage) {
+                const newTargetPositions = processImage(targetImage);
+                transformAnts(newTargetPositions);
+            }
+        });
+        
+        // Start animation
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>

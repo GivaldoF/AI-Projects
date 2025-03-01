@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generative Evolution Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+        
+        header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(45deg, #ff4d4d, #ff9a8b, #ffc759, #8ef6e4, #9896f1);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 10px;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 1200px;
+            gap: 20px;
+        }
+        
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        #canvas-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        
+        button {
+            background: #2d2d2d;
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            min-width: 120px;
+        }
+        
+        button:hover {
+            background: #444444;
+            transform: translateY(-2px);
+        }
+        
+        button.primary {
+            background: linear-gradient(45deg, #ff4d4d, #ff9a8b);
+        }
+        
+        button.primary:hover {
+            background: linear-gradient(45deg, #ff6b6b, #ffb8a8);
+        }
+        
+        .generations {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+        }
+        
+        .generation-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+        }
+        
+        .generation-card {
+            background: #1e1e1e;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            width: 150px;
+            cursor: pointer;
+        }
+        
+        .generation-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .generation-canvas {
+            width: 150px;
+            height: 150px;
+        }
+        
+        .generation-info {
+            padding: 10px;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+        
+        .parameters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+            width: 100%;
+        }
+        
+        .parameter {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            width: 150px;
+        }
+        
+        .parameter label {
+            font-size: 0.8rem;
+            color: #bbbbbb;
+        }
+        
+        .parameter input {
+            width: 100%;
+            padding: 8px;
+            background: #2d2d2d;
+            border: none;
+            border-radius: 5px;
+            color: #ffffff;
+        }
+        
+        .parameter input[type="range"] {
+            -webkit-appearance: none;
+            height: 8px;
+            background: #444444;
+            border-radius: 4px;
+        }
+        
+        .parameter input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #ff4d4d, #ff9a8b);
+            cursor: pointer;
+        }
+        
+        .stats {
+            text-align: center;
+            color: #bbbbbb;
+            margin-top: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .generation-card {
+                width: 120px;
+            }
+            
+            .generation-canvas {
+                width: 120px;
+                height: 120px;
+            }
+            
+            .parameter {
+                width: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Generative Evolution Game</h1>
+        <p>Create, mutate, and evolve your own generative patterns!</p>
+    </header>
+    
+    <div class="container">
+        <div class="game-area">
+            <div id="canvas-container"></div>
+            
+            <div class="controls">
+                <button id="generate" class="primary">Generate New</button>
+                <button id="mutate">Mutate</button>
+                <button id="evolve">Evolve Generation</button>
+                <button id="save">Save This Creation</button>
+            </div>
+            
+            <div class="parameters">
+                <div class="parameter">
+                    <label for="complexity">Complexity</label>
+                    <input type="range" id="complexity" min="1" max="10" value="5">
+                </div>
+                <div class="parameter">
+                    <label for="colorfulness">Colorfulness</label>
+                    <input type="range" id="colorfulness" min="1" max="10" value="7">
+                </div>
+                <div class="parameter">
+                    <label for="symmetry">Symmetry</label>
+                    <input type="range" id="symmetry" min="0" max="10" value="5">
+                </div>
+                <div class="parameter">
+                    <label for="speed">Animation Speed</label>
+                    <input type="range" id="speed" min="0" max="10" value="3">
+                </div>
+            </div>
+            
+            <div class="stats">
+                <p>Generation: <span id="generation-count">0</span> | Mutations: <span id="mutation-count">0</span></p>
+            </div>
+        </div>
+        
+        <div class="generations">
+            <h2>Evolution History</h2>
+            <div class="generation-row" id="history-container">
+                <!-- Generation cards will be added here -->
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Global variables
+        let mainCanvas;
+        let currentGeneration = 0;
+        let mutationCount = 0;
+        let generationHistory = [];
+        let currentPattern;
+        
+        // Pattern parameters
+        let patternParams = {
+            complexity: 5,
+            colorfulness: 7,
+            symmetry: 5,
+            speed: 3,
+            seed: Math.random() * 10000,
+            time: 0
+        };
+        
+        // Initialize the sketch
+        function sketch(p) {
+            p.setup = function() {
+                const containerWidth = document.getElementById('canvas-container').offsetWidth;
+                const canvasSize = Math.min(containerWidth, 600);
+                mainCanvas = p.createCanvas(canvasSize, canvasSize);
+                mainCanvas.parent('canvas-container');
+                p.colorMode(p.HSB, 360, 100, 100, 100);
+                p.noiseDetail(3, 0.5);
+                
+                // Create initial pattern
+                generateNewPattern();
+            };
+            
+            p.draw = function() {
+                p.background(20);
+                
+                if (currentPattern) {
+                    // Update time for animation
+                    patternParams.time += patternParams.speed * 0.01;
+                    
+                    // Draw the current pattern
+                    drawPattern(p, currentPattern, patternParams);
+                }
+            };
+        }
+        
+        // Create a new p5 instance
+        new p5(sketch);
+        
+        // Generate a new random pattern
+        function generateNewPattern() {
+            // Reset mutation count and increase generation
+            mutationCount = 0;
+            currentGeneration++;
+            
+            // Update UI
+            document.getElementById('generation-count').textContent = currentGeneration;
+            document.getElementById('mutation-count').textContent = mutationCount;
+            
+            // Create new pattern parameters
+            patternParams = {
+                complexity: parseInt(document.getElementById('complexity').value),
+                colorfulness: parseInt(document.getElementById('colorfulness').value),
+                symmetry: parseInt(document.getElementById('symmetry').value),
+                speed: parseInt(document.getElementById('speed').value),
+                seed: Math.random() * 10000,
+                time: 0,
+                baseHue: Math.random() * 360,
+                shapeType: Math.floor(Math.random() * 5),
+                particleCount: 10 + Math.floor(Math.random() * 40),
+                flowField: Math.random() > 0.5
+            };
+            
+            // Generate the pattern
+            currentPattern = createPatternDefinition(patternParams);
+            
+            // Add to history
+            addToHistory(currentPattern, patternParams);
+        }
+        
+        // Create a pattern definition based on parameters
+        function createPatternDefinition(params) {
+            // Pattern types:
+            // 0: Particle system
+            // 1: Recursive shapes
+            // 2: Flow field
+            // 3: Orbital system
+            // 4: Cellular automaton
+            
+            const pattern = {
+                type: Math.floor(Math.random() * 5),
+                baseHue: params.baseHue,
+                particles: [],
+                rules: {}
+            };
+            
+            // Create particles
+            for (let i = 0; i < params.particleCount; i++) {
+                pattern.particles.push({
+                    x: Math.random(),
+                    y: Math.random(),
+                    size: 0.01 + Math.random() * 0.05 * params.complexity / 10,
+                    speed: 0.001 + Math.random() * 0.01 * params.speed / 10,
+                    angle: Math.random() * Math.PI * 2,
+                    hue: (pattern.baseHue + Math.random() * 60 * params.colorfulness / 10) % 360,
+                    orbit: Math.random() * 0.2 + 0.1
+                });
+            }
+            
+            // Create rules
+            pattern.rules = {
+                symmetry: params.symmetry,
+                recursionDepth: 1 + Math.floor(params.complexity / 2),
+                flowStrength: 0.1 + Math.random() * 0.3,
+                connectionThreshold: 0.1 + Math.random() * 0.2,
+                rotationSpeed: 0.001 + Math.random() * 0.01 * params.speed / 5,
+                waveAmplitude: 0.1 + Math.random() * 0.2 * params.complexity / 10
+            };
+            
+            return pattern;
+        }
+        
+        // Mutate the current pattern
+        function mutateCurrentPattern() {
+            if (!currentPattern) return;
+            
+            mutationCount++;
+            document.getElementById('mutation-count').textContent = mutationCount;
+            
+            // Randomly change some pattern properties
+            const mutationStrength = 0.2;
+            
+            // Mutate base parameters
+            patternParams.baseHue = (patternParams.baseHue + Math.random() * 30 - 15) % 360;
+            if (patternParams.baseHue < 0) patternParams.baseHue += 360;
+            
+            // Mutate particles
+            for (let i = 0; i < currentPattern.particles.length; i++) {
+                if (Math.random() < 0.3) {
+                    currentPattern.particles[i].hue = (currentPattern.particles[i].hue + Math.random() * 30 - 15) % 360;
+                    if (currentPattern.particles[i].hue < 0) currentPattern.particles[i].hue += 360;
+                }
+                
+                if (Math.random() < 0.2) {
+                    currentPattern.particles[i].size *= 0.8 + Math.random() * 0.4;
+                }
+                
+                if (Math.random() < 0.2) {
+                    currentPattern.particles[i].speed *= 0.8 + Math.random() * 0.4;
+                }
+                
+                if (Math.random() < 0.1) {
+                    currentPattern.particles[i].x = Math.random();
+                    currentPattern.particles[i].y = Math.random();
+                }
+            }
+            
+            // Mutate rules
+            if (Math.random() < 0.3) {
+                currentPattern.rules.flowStrength *= 0.8 + Math.random() * 0.4;
+            }
+            
+            if (Math.random() < 0.3) {
+                currentPattern.rules.connectionThreshold *= 0.8 + Math.random() * 0.4;
+            }
+            
+            if (Math.random() < 0.2) {
+                currentPattern.rules.waveAmplitude *= 0.8 + Math.random() * 0.4;
+            }
+            
+            // Add a new particle occasionally
+            if (Math.random() < 0.1) {
+                currentPattern.particles.push({
+                    x: Math.random(),
+                    y: Math.random(),
+                    size: 0.01 + Math.random() * 0.05,
+                    speed: 0.001 + Math.random() * 0.01,
+                    angle: Math.random() * Math.PI * 2,
+                    hue: (currentPattern.baseHue + Math.random() * 60) % 360,
+                    orbit: Math.random() * 0.2 + 0.1
+                });
+            }
+            
+            // Add to history after significant mutation
+            if (mutationCount % 3 === 0) {
+                addToHistory(currentPattern, { ...patternParams });
+            }
+        }
+        
+        // Evolve to the next generation
+        function evolveGeneration() {
+            if (!currentPattern) return;
+            
+            // Create a new generation based on current pattern
+            currentGeneration++;
+            mutationCount = 0;
+            
+            // Update UI
+            document.getElementById('generation-count').textContent = currentGeneration;
+            document.getElementById('mutation-count').textContent = mutationCount;
+            
+            // Make more significant changes than mutation
+            patternParams.baseHue = (patternParams.baseHue + Math.random() * 60 - 30) % 360;
+            if (patternParams.baseHue < 0) patternParams.baseHue += 360;
+            
+            // Possibly change pattern type
+            if (Math.random() < 0.3) {
+                currentPattern.type = Math.floor(Math.random() * 5);
+            }
+            
+            // Update parameters from sliders
+            patternParams.complexity = parseInt(document.getElementById('complexity').value);
+            patternParams.colorfulness = parseInt(document.getElementById('colorfulness').value);
+            patternParams.symmetry = parseInt(document.getElementById('symmetry').value);
+            patternParams.speed = parseInt(document.getElementById('speed').value);
+            
+            // Apply parameter changes to pattern
+            currentPattern.rules.symmetry = patternParams.symmetry;
+            currentPattern.rules.recursionDepth = 1 + Math.floor(patternParams.complexity / 2);
+            
+            // Randomly replace some particles
+            const replacementRate = 0.3;
+            for (let i = 0; i < currentPattern.particles.length; i++) {
+                if (Math.random() < replacementRate) {
+                    currentPattern.particles[i] = {
+                        x: Math.random(),
+                        y: Math.random(),
+                        size: 0.01 + Math.random() * 0.05 * patternParams.complexity / 10,
+                        speed: 0.001 + Math.random() * 0.01 * patternParams.speed / 10,
+                        angle: Math.random() * Math.PI * 2,
+                        hue: (patternParams.baseHue + Math.random() * 60 * patternParams.colorfulness / 10) % 360,
+                        orbit: Math.random() * 0.2 + 0.1
+                    };
+                }
+            }
+            
+            // Add or remove particles based on complexity
+            const targetParticles = 10 + Math.floor(patternParams.complexity * 4);
+            while (currentPattern.particles.length < targetParticles) {
+                currentPattern.particles.push({
+                    x: Math.random(),
+                    y: Math.random(),
+                    size: 0.01 + Math.random() * 0.05 * patternParams.complexity / 10,
+                    speed: 0.001 + Math.random() * 0.01 * patternParams.speed / 10,
+                    angle: Math.random() * Math.PI * 2,
+                    hue: (patternParams.baseHue + Math.random() * 60 * patternParams.colorfulness / 10) % 360,
+                    orbit: Math.random() * 0.2 + 0.1
+                });
+            }
+            
+            while (currentPattern.particles.length > targetParticles) {
+                currentPattern.particles.pop();
+            }
+            
+            // Add to history
+            addToHistory(currentPattern, { ...patternParams });
+        }
+        
+        // Draw a pattern
+        function drawPattern(p, pattern, params) {
+            const width = p.width;
+            const height = p.height;
+            
+            p.push();
+            p.translate(width / 2, height / 2);
+            
+            switch (pattern.type) {
+                case 0: // Particle system
+                    drawParticleSystem(p, pattern, params);
+                    break;
+                case 1: // Recursive shapes
+                    drawRecursiveShapes(p, pattern, params);
+                    break;
+                case 2: // Flow field
+                    drawFlowField(p, pattern, params);
+                    break;
+                case 3: // Orbital system
+                    drawOrbitalSystem(p, pattern, params);
+                    break;
+                case 4: // Cellular/Organic patterns
+                    drawOrganicPattern(p, pattern, params);
+                    break;
+            }
+            
+            p.pop();
+        }
+        
+        // Draw particle system
+        function drawParticleSystem(p, pattern, params) {
+            const symmetry = pattern.rules.symmetry;
+            const symAngle = (Math.PI * 2) / Math.max(1, symmetry);
+            const time = params.time;
+            
+            // Draw connections between particles
+            p.strokeWeight(1);
+            
+            for (let i = 0; i < pattern.particles.length; i++) {
+                for (let j = i + 1; j < pattern.particles.length; j++) {
+                    const p1 = pattern.particles[i];
+                    const p2 = pattern.particles[j];
+                    
+                    const dx = (p1.x - 0.5) * p.width - (p2.x - 0.5) * p.width;
+                    const dy = (p1.y - 0.5) * p.height - (p2.y - 0.5) * p.height;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    const threshold = pattern.rules.connectionThreshold * p.width;
+                    
+                    if (dist < threshold) {
+                        const alpha = p.map(dist, 0, threshold, 80, 0);
+                        p.stroke(p.map(p1.hue, 0, 360, 0, 255), 50, 100, alpha);
+                        
+                        // Draw lines with symmetry
+                        for (let s = 0; s < symmetry; s++) {
+                            p.push();
+                            p.rotate(symAngle * s);
+                            p.line(
+                                (p1.x - 0.5) * p.width, 
+                                (p1.y - 0.5) * p.height, 
+                                (p2.x - 0.5) * p.width, 
+                                (p2.y - 0.5) * p.height
+                            );
+                            p.pop();
+                        }
+                    }
+                }
+            }
+            
+            // Draw particles
+            for (let s = 0; s < Math.max(1, symmetry); s++) {
+                p.push();
+                p.rotate(symAngle * s);
+                
+                for (let i = 0; i < pattern.particles.length; i++) {
+                    const particle = pattern.particles[i];
+                    
+                    // Update position
+                    const angle = particle.angle + time * particle.speed;
+                    const xOffset = Math.cos(angle) * particle.speed * 50;
+                    const yOffset = Math.sin(angle) * particle.speed * 50;
+                    
+                    const x = (particle.x - 0.5) * p.width + xOffset;
+                    const y = (particle.y - 0.5) * p.height + yOffset;
+                    
+                    // Draw particle
+                    const size = particle.size * p.width;
+                    p.noStroke();
+                    p.fill(particle.hue, 80, 100, 80);
+                    p.ellipse(x, y, size, size);
+                    
+                    // Add glow
+                    p.fill(particle.hue, 80, 100, 30);
+                    p.ellipse(x, y, size * 2, size * 2);
+                }
+                
+                p.pop();
+            }
+        }
+        
+        // Draw recursive shapes
+        function drawRecursiveShapes(p, pattern, params) {
+            const time = params.time;
+            const maxDepth = pattern.rules.recursionDepth;
+            const baseSize = p.width * 0.4;
+            const rotation = time * pattern.rules.rotationSpeed;
+            
+            function drawShape(x, y, size, depth, angle) {
+                if (depth > maxDepth) return;
+                
+                const shapeType = (pattern.shapeType + depth) % 3;
+                const hue = (pattern.baseHue + depth * 30) % 360;
+                
+                p.push();
+                p.translate(x, y);
+                p.rotate(angle + rotation * (depth % 2 === 0 ? 1 : -1));
+                
+                // Draw shape
+                p.noFill();
+                p.strokeWeight(Math.max(1, 5 - depth));
+                p.stroke(hue, 80, 90, 70);
+                
+                switch (shapeType) {
+                    case 0:
+                        p.ellipse(0, 0, size, size);
+                        break;
+                    case 1:
+                        p.rectMode(p.CENTER);
+                        p.rect(0, 0, size, size);
+                        break;
+                    case 2:
+                        drawPolygon(p, 0, 0, size / 2, 3 + depth);
+                        break;
+                }
+                
+                // Draw recursive shapes
+                const childSize = size * 0.6;
+                const childAngle = Math.PI * 2 / pattern.rules.symmetry;
+                
+                for (let i = 0; i < pattern.rules.symmetry; i++) {
+                    const angle = childAngle * i;
+                    const distance = size / 2;
+                    const childX = Math.cos(angle) * distance;
+                    const childY = Math.sin(angle) * distance;
+                    
+                    drawShape(childX, childY, childSize, depth + 1, angle);
+                }
+                
+                p.pop();
+            }
+            
+            drawShape(0, 0, baseSize, 0, 0);
+        }
+        
+        // Draw flow field
+        function drawFlowField(p, pattern, params) {
+            const time = params.time;
+            const particleCount = pattern.particles.length;
+            const fieldScale = 0.003 + pattern.rules.flowStrength * 0.002;
+            const particleSize = p.width * 0.008;
+            
+            p.noStroke();
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = pattern.particles[i];
+                
+                // Calculate flow field angle
+                const x = (particle.x - 0.5) * p.width;
+                const y = (particle.y - 0.5) * p.height;
+                
+                const noiseVal = p.noise(
+                    x * fieldScale, 
+                    y * fieldScale, 
+                    time * 0.1
+                );
+                
+                const angle = noiseVal * Math.PI * 4;
+                
+                // Update particle position
+                particle.x += Math.cos(angle) * particle.speed;
+                particle.y += Math.sin(angle) * particle.speed;
+                
+                // Wrap around edges
+                if (particle.x < 0) particle.x = 1;
+                if (particle.x > 1) particle.x = 0;
+                if (particle.y < 0) particle.y = 1;
+                if (particle.y > 1) particle.y = 0;
+                
+                // Draw particle trail
+                for (let j = 0; j < 5; j++) {
+                    const trailX = x - Math.cos(angle) * particle.speed * p.width * j * 10;
+                    const trailY = y - Math.sin(angle) * particle.speed * p.height * j * 10;
+                    
+                    const alpha = p.map(j, 0, 4, 100, 0);
+                    p.fill(particle.hue, 80, 90, alpha);
+                    
+                    p.ellipse(
+                        trailX, 
+                        trailY, 
+                        particleSize * (5 - j) / 5, 
+                        particleSize * (5 - j) / 5
+                    );
+                }
+            }
+        }
+        
+        // Draw orbital system
+        function drawOrbitalSystem(p, pattern, params) {
+            const time = params.time;
+            const centerX = 0;
+            const centerY = 0;
+            
+            // Draw orbits
+            p.noFill();
+            p.strokeWeight(1);
+            for (let i = 0; i < pattern.particles.length; i++) {
+                const particle = pattern.particles[i];
+                const orbitRadius = particle.orbit * p.width * 0.8;
+                
+                p.stroke(particle.hue, 40, 70, 20);
+                p.ellipse(centerX, centerY, orbitRadius * 2, orbitRadius * 2);
+            }
+            
+            // Draw connections between particles
+            p.strokeWeight(1);
+            for (let i = 0; i < pattern.particles.length; i++) {
+                for (let j = i + 1; j < pattern.particles.length; j++) {
+                    const p1 = pattern.particles[i];
+                    const p2 = pattern.particles[j];
+                    
+                    const orbit1 = p1.orbit * p.width * 0.8;
+                    const orbit2 = p2.orbit * p.width * 0.8;
+                    
+                    const angle1 = time * p1.speed * 2 + p1.angle;
+                    const angle2 = time * p2.speed * 2 + p2.angle;
+                    
+                    const x1 = Math.cos(angle1) * orbit1;
+                    const y1 = Math.sin(angle1) * orbit1;
+                    
+                    const x2 = Math.cos(angle2) * orbit2;
+                    const y2 = Math.sin(angle2) * orbit2;
+                    
+                    const dx = x1 - x2;
+                    const dy = y1 - y2;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    const threshold = pattern.rules.connectionThreshold * p.width * 2;
+                    
+                    if (dist < threshold) {
+                        const alpha = p.map(dist, 0, threshold, 80, 0);
+                        p.stroke((p1.hue + p2.hue) / 2, 70, 90, alpha);
+                        p.line(x1, y1, x2, y2);
+                    }
+                }
+            }
+            
+            // Draw celestial bodies
+            for (let i = 0; i < pattern.particles.length; i++) {
+                const particle = pattern.particles[i];
+                const orbitRadius = particle.orbit * p.width * 0.8;
+                const angle = time * particle.speed * 2 + particle.angle;
+                
+                const x = Math.cos(angle) * orbitRadius;
+                const y = Math.sin(angle) * orbitRadius;
+                
+                // Draw planet
+                const size = particle.size * p.width * 1.5;
+                p.noStroke();
+                p.fill(particle.hue, 80, 90, 90);
+                p.ellipse(x, y, size, size);
+                
+                // Draw glow
+                p.fill(particle.hue, 80, 90, 20);
+                p.ellipse(x, y, size * 2, size * 2);
+            }
+            
+            // Draw central star
+            const centralSize = p.width * 0.15;
+            const glow = centralSize * (1 + Math.sin(time) * 0.05);
+            
+            p.noStroke();
+            
+            // Outer glow
+            p.fill(pattern.baseHue, 70, 100, 10);
+            p.ellipse(centerX, centerY, glow * 3, glow * 3);
+            
+            // Inner glow
+            p.fill(pattern.baseHue, 70, 100, 30);
+            p.ellipse(centerX, centerY, glow * 2, glow * 2);
+            
+            // Core
+            p.fill(pattern.baseHue, 40, 100, 90);
+            p.ellipse(centerX, centerY, glow, glow);
+        }
+        
+        // Draw organic/cellular pattern
+        function drawOrganicPattern(p, pattern, params) {
+            const time = params.time;
+            const width = p.width;
+            const height = p.height;
+            const waveAmplitude = pattern.rules.waveAmplitude;
+            
+            // Draw background cellular pattern
+            const cellSize = width * 0.05;
+            const cols = Math.ceil(width / cellSize);
+            const rows = Math.ceil(height / cellSize);
+            
+            for (let i = -cols/2; i < cols/2; i++) {
+                for (let j = -rows/2; j < rows/2; j++) {
+                    const x = i * cellSize;
+                    const y = j * cellSize;
+                    
+                    const distance = Math.sqrt(x*x + y*y) / (width * 0.5);
+                    const angle = Math.atan2(y, x);
+                    
+                    const noiseVal = p.noise(
+                        (x + width/2) * 0.01, 
+                        (y + height/2) * 0.01, 
+                        time * 0.1
+                    );
+                    
+                    const waveOffset = Math.sin(distance * 10 + time + angle * pattern.rules.symmetry) * waveAmplitude * width * 0.1;
+                    const size = cellSize * (0.3 + noiseVal * 0.7) + waveOffset;
+                    
+                    if (size > 0) {
+                        const hue = (pattern.baseHue + distance * 100) % 360;
+                        const brightness = 70 + noiseVal * 30;
+                        
+                        p.noStroke();
+                        p.fill(hue, 70, brightness, 70);
+                        
+                        if (Math.random() > 0.5) {
+                            p.ellipse(x, y, size, size);
+                        } else {
+                            drawPolygon(p, x, y, size/2, Math.floor(3 + noiseVal * 5));
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Helper function to draw a polygon
+        function drawPolygon(p, x, y, radius, sides) {
+            p.beginShape();
+            for (let i = 0; i < sides; i++) {
+                const angle = p.map(i, 0, sides, 0, p.TWO_PI);
+                const px = x + Math.cos(angle) * radius;
+                const py = y + Math.sin(angle) * radius;
+                p.vertex(px, py);
+            }
+            p.endShape(p.CLOSE);
+        }
+        
+        // Add a pattern to history
+        function addToHistory(pattern, params) {
+            // Clone pattern and parameters to avoid reference issues
+            const patternClone = JSON.parse(JSON.stringify(pattern));
+            const paramsClone = JSON.parse(JSON.stringify(params));
+            
+            // Add to history
+            generationHistory.push({
+                pattern: patternClone,
+                params: paramsClone,
+                generation: currentGeneration,
+                mutations: mutationCount
+            });
+            
+            // Limit history size
+            if (generationHistory.length > 10) {
+                generationHistory.shift();
+            }
+            
+            // Update history display
+            updateHistoryDisplay();
+        }
+        
+        // Update the history display
+        function updateHistoryDisplay() {
+            const container = document.getElementById('history-container');
+            container.innerHTML = '';
+            
+            for (let i = generationHistory.length - 1; i >= 0; i--) {
+                const historyItem = generationHistory[i];
+                
+                // Create card
+                const card = document.createElement('div');
+                card.className = 'generation-card';
+                card.setAttribute('data-index', i);
+                card.addEventListener('click', () => {
+                    loadFromHistory(i);
+                });
+                
+                // Create canvas
+                const canvas = document.createElement('div');
+                canvas.className = 'generation-canvas';
+                
+                // Set up mini canvas
+                new p5(function(p) {
+                    p.setup = function() {
+                        p.createCanvas(150, 150);
+                        p.colorMode(p.HSB, 360, 100, 100, 100);
+                        p.noLoop();
+                    };
+                    
+                    p.draw = function() {
+                        p.background(20);
+                        p.push();
+                        p.translate(p.width/2, p.height/2);
+                        drawPattern(p, historyItem.pattern, { 
+                            ...historyItem.params,
+                            time: historyItem.params.time + 1 // Freeze at time + 1
+                        });
+                        p.pop();
+                    };
+                }, canvas);
+                
+                // Create info div
+                const info = document.createElement('div');
+                info.className = 'generation-info';
+                info.innerHTML = `Gen ${historyItem.generation}<br>Mut ${historyItem.mutations}`;
+                
+                // Add elements to card
+                card.appendChild(canvas);
+                card.appendChild(info);
+                
+                // Add card to container
+                container.appendChild(card);
+            }
+        }
+        
+        // Load a pattern from history
+        function loadFromHistory(index) {
+            if (index < 0 || index >= generationHistory.length) return;
+            
+            const historyItem = generationHistory[index];
+            
+            // Copy pattern and parameters
+            currentPattern = JSON.parse(JSON.stringify(historyItem.pattern));
+            patternParams = JSON.parse(JSON.stringify(historyItem.params));
+            
+            // Update UI
+            currentGeneration = historyItem.generation;
+            mutationCount = historyItem.mutations;
+            
+            document.getElementById('generation-count').textContent = currentGeneration;
+            document.getElementById('mutation-count').textContent = mutationCount;
+            
+            document.getElementById('complexity').value = patternParams.complexity;
+            document.getElementById('colorfulness').value = patternParams.colorfulness;
+            document.getElementById('symmetry').value = patternParams.symmetry;
+            document.getElementById('speed').value = patternParams.speed;
+        }
+        
+        // Save the current pattern
+        function savePattern() {
+            const canvas = document.querySelector('#canvas-container canvas');
+            if (canvas) {
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = `generative-pattern-gen${currentGeneration}-mut${mutationCount}.png`;
+                link.click();
+            }
+        }
+        
+        // Add event listeners
+        document.getElementById('generate').addEventListener('click', generateNewPattern);
+        document.getElementById('mutate').addEventListener('click', mutateCurrentPattern);
+        document.getElementById('evolve').addEventListener('click', evolveGeneration);
+        document.getElementById('save').addEventListener('click', savePattern);
+        
+        // Update parameters when sliders change
+        document.querySelectorAll('.parameter input').forEach(input => {
+            input.addEventListener('input', () => {
+                const param = input.id;
+                patternParams[param] = parseInt(input.value);
+            });
+        });
+        
+        // Generate initial pattern
+        generateNewPattern();
+    </script>
+</body>
+</html>
